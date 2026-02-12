@@ -1,0 +1,18 @@
+{
+  "model_id": "per_bucket_v1",
+  "tier": "silver",
+  "run_date": "20260211",
+  "config": "model=perbucket, bankroll=$1,000, kelly=0.25, min_edge=5%, entry=T-24h",
+  "metrics": {
+    "brier_score": 0.647796,
+    "log_loss": 1.550612,
+    "accuracy": "4/9",
+    "roi_pct": -100.0,
+    "n_events": 9,
+    "n_bets": 1,
+    "total_pnl": -15.25,
+    "total_wagered": 15.25
+  },
+  "notes": "Auto-logged from run_backtest.py",
+  "logged_at": "2026-02-11T01:23:25.887610+00:00"
+}

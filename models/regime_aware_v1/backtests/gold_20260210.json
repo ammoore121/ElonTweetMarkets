@@ -1,0 +1,18 @@
+{
+  "model_id": "regime_aware_v1",
+  "tier": "gold",
+  "run_date": "2026-02-10",
+  "config": "model=regime, bankroll=$1,000, kelly=0.25, min_edge=5%, entry=T-24h",
+  "metrics": {
+    "brier_score": 1.301253,
+    "log_loss": 6.798067,
+    "accuracy": "3/38",
+    "roi_pct": -91.95,
+    "n_events": 38,
+    "n_bets": 96,
+    "total_pnl": -2789.60,
+    "total_wagered": 3033.80
+  },
+  "notes": "Auto-migrated from model_registry.json v1. Grossly overestimates tail probabilities.",
+  "source_file": "data/results/backtest_regime_aware_20260210_213750.json"
+}

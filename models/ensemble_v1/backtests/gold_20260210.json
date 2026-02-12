@@ -1,0 +1,18 @@
+{
+  "model_id": "ensemble_v1",
+  "tier": "gold",
+  "run_date": "2026-02-10",
+  "config": "model=ensemble, bankroll=$1,000, kelly=0.25, min_edge=5%, entry=T-24h",
+  "metrics": {
+    "brier_score": 0.800449,
+    "log_loss": 1.833883,
+    "accuracy": "6/38",
+    "roi_pct": 0.0,
+    "n_events": 38,
+    "n_bets": 0,
+    "total_pnl": 0.0,
+    "total_wagered": 0.0
+  },
+  "notes": "Auto-migrated from model_registry.json v1. Same as MarketAdjusted when crowd data present.",
+  "source_file": "data/results/backtest_ensemble_20260210_213756.json"
+}

@@ -1,0 +1,18 @@
+{
+  "model_id": "market_adjusted_v1",
+  "tier": "silver",
+  "run_date": "20260211",
+  "config": "model=adjusted, bankroll=$1,000, kelly=0.25, min_edge=5%, entry=T-24h",
+  "metrics": {
+    "brier_score": 0.643041,
+    "log_loss": 1.519395,
+    "accuracy": "4/9",
+    "roi_pct": 0.0,
+    "n_events": 9,
+    "n_bets": 0,
+    "total_pnl": 0,
+    "total_wagered": 0
+  },
+  "notes": "Auto-logged from run_backtest.py",
+  "logged_at": "2026-02-11T01:23:22.332470+00:00"
+}

@@ -1,0 +1,8 @@
+pipeline_id,pipeline_name,type,input_sources,output_location,script,status,description
+xtracker_fetch,XTracker Daily Fetch,fetch,XTracker API,data/sources/xtracker/,scripts/fetch_xtracker_history.py,active,Fetch daily tweet counts from XTracker
+polymarket_events_fetch,Polymarket Events Fetch,fetch,Polymarket Gamma API,data/sources/polymarket/,scripts/fetch_elon_markets.py,active,Fetch Elon tweet categorical events
+polymarket_prices_fetch,Polymarket Price History Fetch,fetch,Polymarket CLOB API,data/sources/polymarket/prices/events/,scripts/fetch_clob_prices.py,active,Fetch hourly price history per event (backfill and daily modes)
+polymarket_prices_consolidate,Polymarket Price Consolidation,transform,polymarket_prices_fetch,data/sources/polymarket/prices/price_history.parquet,scripts/consolidate_prices.py,active,Merge per-event and daily price files into master parquet
+gdelt_fetch,GDELT News Fetch,fetch,GDELT DOC API,data/sources/gdelt/,scripts/fetch_gdelt_news.py,active,Fetch news volume/tone timelines
+spacex_fetch,SpaceX Launch Fetch,fetch,Launch Library 2 API,data/sources/calendar/,scripts/fetch_spacex_launches.py,active,Fetch SpaceX launch schedule
+market_catalog_build,Market Catalog Build,transform,polymarket_events + polymarket_events_full + polymarket_clob,data/processed/market_catalog.parquet,scripts/build_market_catalog.py,active,"Parse JSON events into flat parquet catalog"

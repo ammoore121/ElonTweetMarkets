@@ -1,0 +1,18 @@
+{
+  "model_id": "naive_negbin_v1",
+  "tier": "gold",
+  "run_date": "2026-02-10",
+  "config": "model=naive, bankroll=$1,000, kelly=0.25, min_edge=5%, entry=T-24h",
+  "metrics": {
+    "brier_score": 1.050588,
+    "log_loss": 4.624483,
+    "accuracy": "3/38",
+    "roi_pct": -92.56,
+    "n_events": 38,
+    "n_bets": 163,
+    "total_pnl": -4035.99,
+    "total_wagered": 4360.43
+  },
+  "notes": "Auto-migrated from model_registry.json v1. Poor calibration due to regime shifts.",
+  "source_file": "data/results/backtest_naive_negbin_20260210_214049.json"
+}

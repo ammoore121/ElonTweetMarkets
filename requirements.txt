@@ -1,0 +1,20 @@
+# Core
+pandas>=2.0
+numpy>=1.24
+requests>=2.31
+python-dotenv>=1.0
+
+# ML
+scikit-learn>=1.3
+xgboost>=2.0
+scipy>=1.11
+
+# Polymarket
+py-clob-client>=0.1
+
+# Data storage
+pyarrow>=14.0
+fastparquet>=2023.10
+
+# Utilities
+tqdm>=4.66

@@ -1,0 +1,18 @@
+{
+  "model_id": "crowd_v1",
+  "tier": "bronze",
+  "run_date": "20260211",
+  "config": "model=crowd, bankroll=$1,000, kelly=0.25, min_edge=5%, entry=T-24h",
+  "metrics": {
+    "brier_score": 0.50768,
+    "log_loss": 1.044845,
+    "accuracy": "65/112",
+    "roi_pct": 0.0,
+    "n_events": 112,
+    "n_bets": 0,
+    "total_pnl": 0,
+    "total_wagered": 0
+  },
+  "notes": "Auto-logged from run_backtest.py",
+  "logged_at": "2026-02-11T01:23:25.482325+00:00"
+}

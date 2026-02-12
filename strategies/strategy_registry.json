@@ -1,0 +1,226 @@
+{
+  "version": "2.0",
+  "updated_at": "2026-02-11",
+  "strategies": {
+    "tail_boost_primary": {
+      "strategy_id": "tail_boost_primary",
+      "strategy_name": "Tail Boost Primary (Most Trusted)",
+      "model_id": "tail_boost_v1",
+      "status": "paper",
+      "description": "Primary production strategy. TailBoost is most trusted due to highest bet volume (60 bets in backtest) giving strongest statistical confidence at +44.4% ROI.",
+      "filters": {
+        "min_edge": 0.02,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": ["weekly", "daily", "short"],
+        "min_duration_days": 1,
+        "require_temporal_features": true
+      },
+      "sizing": {
+        "kelly_fraction": 0.25,
+        "max_bet_pct": 0.05,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "gold",
+        "n_events": 38,
+        "n_bets": 60,
+        "brier": 0.8022,
+        "roi_pct": 44.4,
+        "pnl": 248.56,
+        "min_edge": 0.02
+      },
+      "created_at": "2026-02-11",
+      "notes": "Most trusted model. 60 bets in 38 events = trades frequently with consistent edge."
+    },
+    "duration_tail_robust": {
+      "strategy_id": "duration_tail_robust",
+      "strategy_name": "Duration-Tail Robust",
+      "model_id": "duration_tail_v1",
+      "status": "paper",
+      "description": "Most robust by absolute P&L. Duration-aware shrink + tail boost. 43 bets at +67.7% ROI, highest P&L ($289).",
+      "filters": {
+        "min_edge": 0.02,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": ["weekly", "daily", "short"],
+        "min_duration_days": 1,
+        "require_temporal_features": true
+      },
+      "sizing": {
+        "kelly_fraction": 0.25,
+        "max_bet_pct": 0.05,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "gold",
+        "n_events": 38,
+        "n_bets": 43,
+        "brier": 0.8016,
+        "roi_pct": 67.7,
+        "pnl": 289.42,
+        "min_edge": 0.02
+      },
+      "created_at": "2026-02-11",
+      "notes": "Best absolute P&L. 43 bets is high confidence."
+    },
+    "asymmetric_selective": {
+      "strategy_id": "asymmetric_selective",
+      "strategy_name": "Asymmetric Selective (High ROI)",
+      "model_id": "asymmetric_per_bucket_v1",
+      "status": "paper",
+      "description": "Highest ROI model (152.6%) but selective: only 9 bets in 38 events. Best for small bankrolls where you want max return per bet.",
+      "filters": {
+        "min_edge": 0.02,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": ["weekly", "daily", "short"],
+        "min_duration_days": 1,
+        "require_temporal_features": true
+      },
+      "sizing": {
+        "kelly_fraction": 0.25,
+        "max_bet_pct": 0.05,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "gold",
+        "n_events": 38,
+        "n_bets": 9,
+        "brier": 0.7992,
+        "roi_pct": 152.6,
+        "pnl": 122.12,
+        "min_edge": 0.02
+      },
+      "created_at": "2026-02-11",
+      "notes": "WARNING: -91% on bronze tier. Z-score is regime-specific. Use with caution."
+    },
+    "per_bucket_proven": {
+      "strategy_id": "per_bucket_proven",
+      "strategy_name": "Per-Bucket Proven Baseline",
+      "model_id": "per_bucket_v1",
+      "status": "paper",
+      "description": "Original proven model with symmetric z-score momentum. Well-understood mechanics.",
+      "filters": {
+        "min_edge": 0.02,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": ["weekly", "daily", "short"],
+        "min_duration_days": 1,
+        "require_temporal_features": true
+      },
+      "sizing": {
+        "kelly_fraction": 0.25,
+        "max_bet_pct": 0.05,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "gold",
+        "n_events": 38,
+        "n_bets": 12,
+        "brier": 0.7993,
+        "roi_pct": 67.6,
+        "pnl": 66.94,
+        "min_edge": 0.02
+      },
+      "created_at": "2026-02-11",
+      "notes": "WARNING: -92% on bronze tier. Z-score is regime-specific. Use with caution."
+    },
+    "duration_shrink_simple": {
+      "strategy_id": "duration_shrink_simple",
+      "strategy_name": "Duration Shrink Simple",
+      "model_id": "duration_shrink_v1",
+      "status": "paper",
+      "description": "Simplest profitable model: just shrinks crowd EV for short events. Easy to explain and verify.",
+      "filters": {
+        "min_edge": 0.02,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": ["daily", "short"],
+        "min_duration_days": 1,
+        "require_temporal_features": true
+      },
+      "sizing": {
+        "kelly_fraction": 0.25,
+        "max_bet_pct": 0.05,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "gold",
+        "n_events": 38,
+        "n_bets": 23,
+        "brier": 0.8095,
+        "roi_pct": 49.7,
+        "pnl": 125.43,
+        "min_edge": 0.02
+      },
+      "created_at": "2026-02-11",
+      "notes": "Simplest model. Only trades daily/short markets where crowd overestimates."
+    },
+    "crowd_baseline": {
+      "strategy_id": "crowd_baseline",
+      "strategy_name": "Crowd Baseline (Control)",
+      "model_id": "crowd_v1",
+      "status": "inactive",
+      "description": "Control strategy that agrees with market. Should produce 0 bets.",
+      "filters": {
+        "min_edge": 0.05,
+        "max_edge": 1.0,
+        "min_bucket_price": 0.0,
+        "max_bucket_price": 1.0,
+        "market_types": ["weekly", "daily", "monthly", "short"],
+        "min_duration_days": 1,
+        "require_temporal_features": false
+      },
+      "sizing": {
+        "kelly_fraction": 0.25,
+        "max_bet_pct": 0.05,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "gold",
+        "n_events": 38,
+        "n_bets": 0,
+        "brier": 0.8137,
+        "roi_pct": 0.0
+      },
+      "created_at": "2026-02-10",
+      "notes": "Sanity check. Should never trade."
+    }
+  }
+}

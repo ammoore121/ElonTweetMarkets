@@ -141,12 +141,33 @@
 
 ---
 
-### Phase 8: Paper Trading & Live Deployment (Next)
+### Phase 8: Paper Trading & Live Deployment ✅ (Mostly Complete)
 
-- [ ] **Task 17: Adapt paper trading for categorical markets** - live signal generation
-- [ ] **Task 18: Build cron pipeline** (`scripts/cron_pipeline.py`) - daily automated execution
-- [ ] **Task 19: Daily data refresh** - XTracker + CLOB prices daily update scripts
-- [ ] **Task 20: Live signal dashboard** - compare model signals across strategies
+- [x] **Task 17: Adapt paper trading for categorical markets**
+  - `scripts/fetch_current_odds.py` (197 lines) — captures live bucket prices as MarketOdds snapshots
+  - `scripts/generate_signals.py` (345 lines) — runs models via strategy registry, applies filters, Kelly sizing
+  - `scripts/settle_bets.py` (228 lines) — resolves completed events using XTracker as oracle
+  - `src/ml/registry.py` updated with `instantiate_model()` factory for dynamic model loading
+  - `src/paper_trading/tracker.py` updated with configurable odds_dir/signals_dir storage paths
+
+- [x] **Task 18: Build cron pipeline** (`scripts/cron_pipeline.py`)
+  - 193 lines, orchestrates: XTracker refresh → fetch odds → generate signals → settle bets → summary
+  - Flags: `--dry-run`, `--skip-xtracker`
+  - Designed for Task Scheduler / cron (every 6 hours)
+
+- [x] **Task 19: Daily data refresh**
+  - XTracker refresh integrated into cron pipeline (step 1)
+  - CLOB price refresh via existing `scripts/fetch_clob_prices.py --daily`
+
+- [x] **Task 20: End-to-end validation**
+  - Full pipeline passes: 4/4 steps OK in 27.7s (dry-run mode)
+  - Fixed: `PerBucketModel` and `MarketAdjustedModel` `__init__` signatures now accept registry hyperparameters
+  - 404s on delisted tokens: expected behavior (Polymarket delists zero-probability buckets mid-event), handled gracefully
+  - Feature builder performance: fast (~0.3s per event), no bottleneck
+  - 3 active events, 5 strategies, 15 signals generated, 3 actionable (TailBoost + DurationTail)
+  - 66 total signals accumulated across test runs
+
+- [ ] **Task 21: Live signal dashboard** — compare model signals across strategies
 
 ---
 
@@ -190,3 +211,6 @@ Pipeline is "working" when:
 | 2026-02-11 | Registry v3.0: 14 models, 5 strategies, 3 deprecated approaches |
 | 2026-02-11 | **Cross-tier validation**: TailBoost only model profitable across all 159 events (21 months). Z-score models fail on bronze. |
 | 2026-02-11 | Model confidence tiers established: Structural (TailBoost, DurationShrink) > Robust Recent (DurationTail) > Regime-Specific (PerBucket, Asym) |
+| 2026-02-11 | Paper trading pipeline built: fetch_current_odds, generate_signals, settle_bets, cron_pipeline (2,363 lines) |
+| 2026-02-12 | Task list updated to reflect Phase 8 completion. End-to-end pipeline validated: 4/4 steps pass. |
+| 2026-02-12 | Fixed PerBucketModel + MarketAdjustedModel init signatures for registry hyperparameter injection. |

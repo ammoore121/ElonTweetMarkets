@@ -1,6 +1,6 @@
 {
   "auto_bet": {
-    "enabled": false,
+    "enabled": true,
     "mode": "paper",
     "use_kelly": true,
     "kelly_fraction": 0.25,

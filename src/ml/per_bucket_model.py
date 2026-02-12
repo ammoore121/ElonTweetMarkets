@@ -82,9 +82,29 @@ class PerBucketModel(BasePredictionModel):
     ZSCORE_ALPHA = 0.24     # z_score * momentum correction strength
     MAX_CORRECTION = 0.30   # Cap per-bucket correction at 30%
 
-    def __init__(self, name: str = "per_bucket", version: str = "v1"):
+    def __init__(
+        self,
+        name: str = "per_bucket",
+        version: str = "v1",
+        zscore_alpha: float = None,
+        max_correction: float = None,
+        base_momentum_strength: float = None,
+        base_reversion_strength: float = None,
+        base_widen_strength: float = None,
+    ):
         super().__init__(name=name, version=version)
-        self._base_model = MarketAdjustedModel()
+        if zscore_alpha is not None:
+            self.ZSCORE_ALPHA = zscore_alpha
+        if max_correction is not None:
+            self.MAX_CORRECTION = max_correction
+        base_kwargs = {}
+        if base_momentum_strength is not None:
+            base_kwargs["momentum_strength"] = base_momentum_strength
+        if base_reversion_strength is not None:
+            base_kwargs["reversion_strength"] = base_reversion_strength
+        if base_widen_strength is not None:
+            base_kwargs["widen_strength"] = base_widen_strength
+        self._base_model = MarketAdjustedModel(**base_kwargs)
 
     def predict(
         self,

@@ -530,8 +530,24 @@ class MarketAdjustedModel(BasePredictionModel):
     REVERSION_STRENGTH = 0.28    # How aggressively to regress to rolling avg
     REGIME_CORRECTION = 0.00     # Regime correction disabled (hurts calibration)
 
-    def __init__(self, name: str = "market_adjusted", version: str = "v1"):
+    def __init__(
+        self,
+        name: str = "market_adjusted",
+        version: str = "v1",
+        momentum_strength: float = None,
+        widen_strength: float = None,
+        reversion_strength: float = None,
+        regime_correction: float = None,
+    ):
         super().__init__(name=name, version=version)
+        if momentum_strength is not None:
+            self.MOMENTUM_STRENGTH = momentum_strength
+        if widen_strength is not None:
+            self.WIDEN_STRENGTH = widen_strength
+        if reversion_strength is not None:
+            self.REVERSION_STRENGTH = reversion_strength
+        if regime_correction is not None:
+            self.REGIME_CORRECTION = regime_correction
 
     def predict(
         self,

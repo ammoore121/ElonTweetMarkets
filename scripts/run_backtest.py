@@ -38,6 +38,7 @@ from src.backtesting.engine import BacktestEngine
 from src.ml.baseline_model import NaiveBucketModel, CrowdModel
 from src.ml.advanced_models import RegimeAwareModel, MarketAdjustedModel, EnsembleModel
 from src.ml.per_bucket_model import PerBucketModel
+from src.ml.signal_enhanced_model import SignalEnhancedTailModel, SignalEnhancedTailModelV4
 from src.ml.registry import ModelRegistry, StrategyRegistry
 
 # ---------------------------------------------------------------------------
@@ -58,6 +59,8 @@ MODEL_MAP = {
     "adjusted": MarketAdjustedModel,
     "ensemble": EnsembleModel,
     "perbucket": PerBucketModel,
+    "signal_enhanced": SignalEnhancedTailModel,
+    "signal_enhanced_v4": SignalEnhancedTailModelV4,
 }
 
 # Maps model_id from registry to MODEL_MAP key for instantiation
@@ -68,6 +71,10 @@ MODEL_ID_TO_KEY = {
     "market_adjusted_v1": "adjusted",
     "ensemble_v1": "ensemble",
     "per_bucket_v1": "perbucket",
+    "signal_enhanced_tail_v1": "signal_enhanced",
+    "signal_enhanced_tail_v2": "signal_enhanced",
+    "signal_enhanced_tail_v3": "signal_enhanced",
+    "signal_enhanced_tail_v4": "signal_enhanced_v4",
 }
 
 
@@ -212,9 +219,16 @@ def main():
                 [s["strategy_id"] for s in sr.list_strategies()]))
             sys.exit(1)
 
-        # Get model from strategy
+        # Get model from strategy — use ModelRegistry.instantiate_model()
+        # so hyperparameters from the registry are injected correctly
+        # (e.g. signal_enhanced_tail_v2 vs v3 have different params)
         model_id = strategy_def["model_id"]
-        model = load_model_from_id(model_id)
+        try:
+            mr = ModelRegistry()
+            model = mr.instantiate_model(model_id)
+        except (ValueError, KeyError):
+            # Fallback to MODEL_MAP if not in registry
+            model = load_model_from_id(model_id)
 
         # Build engine config from strategy
         engine_config = sr.build_engine_config(strategy_id)

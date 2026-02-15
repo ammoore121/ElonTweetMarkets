@@ -37,6 +37,9 @@ from src.features.extractors import (
     compute_calendar_features,
     compute_market_features,
     compute_cross_features,
+    compute_financial_features,
+    compute_attention_features,
+    compute_trends_features,
 )
 
 
@@ -59,6 +62,12 @@ CATALOG_PATH = PROJECT_DIR / "data" / "processed" / "market_catalog.parquet"
 PRICE_HISTORY_PATH = (
     PROJECT_DIR / "data" / "sources" / "polymarket" / "prices" / "price_history.parquet"
 )
+TESLA_PATH = PROJECT_DIR / "data" / "sources" / "market" / "tesla_daily.parquet"
+CRYPTO_PATH = PROJECT_DIR / "data" / "sources" / "market" / "crypto_daily.parquet"
+WIKI_PATH = PROJECT_DIR / "data" / "sources" / "wikipedia" / "pageviews.json"
+VIX_PATH = PROJECT_DIR / "data" / "sources" / "market" / "vix_daily.parquet"
+TRENDS_PATH = PROJECT_DIR / "data" / "sources" / "trends" / "google_trends.parquet"
+CRYPTO_FG_PATH = PROJECT_DIR / "data" / "sources" / "market" / "crypto_fear_greed.parquet"
 
 # GDELT entity keys (filename stems)
 GDELT_ENTITIES = ["elon_musk", "tesla", "spacex", "neuralink"]
@@ -107,9 +116,37 @@ CROSS_FEATURES = [
     "momentum_reversal_signal",
 ]
 
+FINANCIAL_FEATURES = [
+    "tsla_pct_change_1d", "tsla_pct_change_5d", "tsla_volatility_5d",
+    "tsla_volume_ratio", "tsla_drawdown_5d", "tsla_gap_1d",
+    "doge_pct_change_1d", "doge_pct_change_5d", "doge_volatility_5d",
+    "btc_pct_change_1d", "btc_pct_change_5d", "btc_volatility_5d",
+    # VIX
+    "vix_close", "vix_pct_change_1d", "vix_pct_change_5d",
+    "vix_level_category", "vix_ma5_ratio",
+    # Crypto Fear & Greed
+    "crypto_fg_value", "crypto_fg_7d_avg", "crypto_fg_delta", "crypto_fg_category",
+]
+
+ATTENTION_FEATURES = [
+    "wiki_elon_musk_7d", "wiki_elon_musk_delta",
+    "wiki_tesla_7d", "wiki_tesla_delta",
+    "wiki_doge_7d", "wiki_doge_delta",
+    "wiki_total_7d", "wiki_attention_concentration",
+]
+
+TRENDS_FEATURES = [
+    "gt_elon_musk_7d", "gt_elon_musk_delta",
+    "gt_tesla_7d", "gt_tesla_delta",
+    "gt_spacex_7d", "gt_spacex_delta",
+    "gt_dogecoin_7d", "gt_dogecoin_delta",
+    "gt_total_7d", "gt_concentration",
+]
+
 ALL_FEATURES = (
     TEMPORAL_FEATURES + MEDIA_FEATURES + CALENDAR_FEATURES
     + MARKET_FEATURES + CROSS_FEATURES
+    + FINANCIAL_FEATURES + ATTENTION_FEATURES + TRENDS_FEATURES
 )
 
 
@@ -126,8 +163,8 @@ FEATURE_GROUPS: Dict[str, Dict[str, Any]] = {
     },
     "full": {
         "features": ALL_FEATURES,
-        "categories": {"temporal", "media", "calendar", "market", "cross"},
-        "description": "All 36+ available features across all categories",
+        "categories": {"temporal", "media", "calendar", "market", "cross", "financial", "attention", "trends"},
+        "description": "All 91 available features across all categories",
     },
     "market_adjusted": {
         "features": [
@@ -147,9 +184,20 @@ FEATURE_GROUPS: Dict[str, Dict[str, Any]] = {
             # Cross
             "bad_press_x_low_activity", "regime_transition_flag",
             "momentum_reversal_signal",
+            # Financial (new)
+            "tsla_pct_change_1d", "tsla_volatility_5d", "tsla_drawdown_5d",
+            "doge_pct_change_1d", "doge_volatility_5d",
+            # Attention (new)
+            "wiki_elon_musk_7d", "wiki_elon_musk_delta",
+            # VIX
+            "vix_close", "vix_ma5_ratio",
+            # Crypto Fear & Greed
+            "crypto_fg_value", "crypto_fg_delta",
+            # Trends
+            "gt_elon_musk_7d", "gt_elon_musk_delta",
         ],
-        "categories": {"temporal", "media", "calendar", "market", "cross"},
-        "description": "Features for market-adjusted predictions (23 factors)",
+        "categories": {"temporal", "media", "calendar", "market", "cross", "financial", "attention", "trends"},
+        "description": "Features for market-adjusted predictions (36 factors)",
     },
     "temporal_only": {
         "features": TEMPORAL_FEATURES + CALENDAR_FEATURES,
@@ -261,6 +309,56 @@ def _load_spacex_launches() -> List[str]:
     return sorted(set(dates))
 
 
+def _load_tesla_data() -> pd.DataFrame:
+    """Load Tesla daily OHLCV data from parquet."""
+    if not TESLA_PATH.exists():
+        return pd.DataFrame()
+    return pd.read_parquet(TESLA_PATH)
+
+
+def _load_crypto_data() -> pd.DataFrame:
+    """Load crypto (DOGE, BTC) daily data from parquet."""
+    if not CRYPTO_PATH.exists():
+        return pd.DataFrame()
+    return pd.read_parquet(CRYPTO_PATH)
+
+
+def _load_wiki_data() -> dict:
+    """Load Wikipedia pageview data from JSON.
+
+    Returns dict: {entity_key: {article, daily_views: {date: count}, ...}}
+    """
+    if not WIKI_PATH.exists():
+        return {}
+    try:
+        with open(WIKI_PATH, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        return raw.get("articles", {})
+    except (json.JSONDecodeError, IOError):
+        return {}
+
+
+def _load_vix_data() -> pd.DataFrame:
+    """Load VIX daily OHLCV data from parquet."""
+    if not VIX_PATH.exists():
+        return pd.DataFrame()
+    return pd.read_parquet(VIX_PATH)
+
+
+def _load_trends_data() -> pd.DataFrame:
+    """Load Google Trends data from parquet."""
+    if not TRENDS_PATH.exists():
+        return pd.DataFrame()
+    return pd.read_parquet(TRENDS_PATH)
+
+
+def _load_crypto_fg_data() -> pd.DataFrame:
+    """Load Crypto Fear & Greed data from parquet."""
+    if not CRYPTO_FG_PATH.exists():
+        return pd.DataFrame()
+    return pd.read_parquet(CRYPTO_FG_PATH)
+
+
 def _load_catalog() -> pd.DataFrame:
     """Load market_catalog.parquet."""
     if not CATALOG_PATH.exists():
@@ -327,6 +425,12 @@ class TweetFeatureBuilder:
         self._spacex_launches: Optional[List[str]] = None
         self._catalog_df: Optional[pd.DataFrame] = None
         self._prices_df: Optional[pd.DataFrame] = None
+        self._tesla_data: Optional[pd.DataFrame] = None
+        self._crypto_data: Optional[pd.DataFrame] = None
+        self._wiki_data: Optional[dict] = None
+        self._vix_data: Optional[pd.DataFrame] = None
+        self._trends_data: Optional[pd.DataFrame] = None
+        self._crypto_fg_data: Optional[pd.DataFrame] = None
 
     # ------------------------------------------------------------------
     # Lazy data source accessors
@@ -360,6 +464,42 @@ class TweetFeatureBuilder:
         if self._prices_df is None:
             self._prices_df = _load_prices()
         return self._prices_df
+
+    @property
+    def tesla_data(self) -> pd.DataFrame:
+        if self._tesla_data is None:
+            self._tesla_data = _load_tesla_data()
+        return self._tesla_data
+
+    @property
+    def crypto_data(self) -> pd.DataFrame:
+        if self._crypto_data is None:
+            self._crypto_data = _load_crypto_data()
+        return self._crypto_data
+
+    @property
+    def wiki_data(self) -> dict:
+        if self._wiki_data is None:
+            self._wiki_data = _load_wiki_data()
+        return self._wiki_data
+
+    @property
+    def vix_data(self) -> pd.DataFrame:
+        if self._vix_data is None:
+            self._vix_data = _load_vix_data()
+        return self._vix_data
+
+    @property
+    def trends_data(self) -> pd.DataFrame:
+        if self._trends_data is None:
+            self._trends_data = _load_trends_data()
+        return self._trends_data
+
+    @property
+    def crypto_fg_data(self) -> pd.DataFrame:
+        if self._crypto_fg_data is None:
+            self._crypto_fg_data = _load_crypto_fg_data()
+        return self._crypto_fg_data
 
     # ------------------------------------------------------------------
     # Category need checks
@@ -452,6 +592,35 @@ class TweetFeatureBuilder:
         else:
             cross = {}
         result["cross"] = cross
+
+        # --- 6. Financial features (Tesla stock + crypto + VIX + crypto F&G) ---
+        if self._needs("financial"):
+            financial = compute_financial_features(
+                self.tesla_data, self.crypto_data, start_date,
+                vix_data=self.vix_data,
+                crypto_fg_data=self.crypto_fg_data,
+            )
+        else:
+            financial = {}
+        result["financial"] = financial
+
+        # --- 7. Attention features (Wikipedia pageviews) ---
+        if self._needs("attention"):
+            attention = compute_attention_features(
+                self.wiki_data, start_date
+            )
+        else:
+            attention = {}
+        result["attention"] = attention
+
+        # --- 8. Trends features (Google Trends) ---
+        if self._needs("trends"):
+            trends = compute_trends_features(
+                self.trends_data, start_date
+            )
+        else:
+            trends = {}
+        result["trends"] = trends
 
         return result
 

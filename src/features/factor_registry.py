@@ -2,7 +2,7 @@
 Comprehensive factor registry for Elon Musk tweet count prediction.
 ====================================================================
 
-Defines ~30 predictive factors organized by category, with metadata,
+Defines ~56 predictive factors organized by category, with metadata,
 computation formulas, rationale, and data-source references. This module
 serves as the single source of truth for which features the model consumes.
 
@@ -12,6 +12,8 @@ Categories:
     calendar   - SpaceX launches, day-of-week, holiday effects
     market     - Crowd-derived signals from Polymarket prices
     cross      - Interaction features combining multiple raw signals
+    financial  - Tesla stock and crypto (DOGE, BTC) price/volatility signals
+    attention  - Wikipedia pageview signals as public attention proxies
 
 Usage:
     from src.features.factor_registry import FACTOR_REGISTRY, print_factor_summary
@@ -37,7 +39,7 @@ class Factor:
     """A single predictive factor (feature) definition."""
 
     name: str
-    category: str  # temporal | media | calendar | market | cross
+    category: str  # temporal | media | calendar | market | cross | financial | attention
     description: str
     formula: str
     rationale: str
@@ -721,11 +723,607 @@ CROSS_FACTORS: List[Factor] = [
 
 
 # ---------------------------------------------------------------------------
+# FINANCIAL factors (~12)
+# Derived from Tesla stock (yfinance TSLA) and crypto (yfinance DOGE-USD, BTC-USD)
+# ---------------------------------------------------------------------------
+FINANCIAL_FACTORS: List[Factor] = [
+    Factor(
+        name="tsla_pct_change_1d",
+        category="financial",
+        description="Tesla 1-day percentage price change",
+        formula="(close[t-1] - close[t-2]) / close[t-2]",
+        rationale=(
+            "Immediate Tesla stock momentum. Large daily moves may trigger "
+            "Elon tweets about stock/market."
+        ),
+        data_source="yfinance TSLA daily OHLCV (data/sources/market/tesla_daily.parquet)",
+        coverage_pct=98.7,
+        expected_range="-0.10 to +0.10",
+        existing=True,
+        priority="high",
+    ),
+    Factor(
+        name="tsla_pct_change_5d",
+        category="financial",
+        description="Tesla 5-day cumulative return",
+        formula="(close[t-1] - close[t-5]) / close[t-5]",
+        rationale=(
+            "Medium-term Tesla momentum. Sustained rallies or sell-offs "
+            "over a week may shift Musk's tweeting focus toward markets."
+        ),
+        data_source="yfinance TSLA daily OHLCV (data/sources/market/tesla_daily.parquet)",
+        coverage_pct=98.7,
+        expected_range="-0.20 to +0.20",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="tsla_volatility_5d",
+        category="financial",
+        description="Tesla 5-day realized volatility (std of daily returns)",
+        formula="std(pct_change[t-5:t-1])",
+        rationale=(
+            "High TSLA vol = Elon likely tweeting about markets. "
+            "Signal threshold: >3% = elevated."
+        ),
+        data_source="yfinance TSLA daily OHLCV (data/sources/market/tesla_daily.parquet)",
+        coverage_pct=98.7,
+        expected_range="0.01-0.08",
+        eda_signal="Used by SignalEnhancedTailModel (threshold=0.03)",
+        existing=True,
+        priority="high",
+    ),
+    Factor(
+        name="tsla_volume_ratio",
+        category="financial",
+        description="Tesla volume ratio (last day vs 5-day moving average)",
+        formula="volume[t-1] / mean(volume[t-5:t-1])",
+        rationale=(
+            "Unusual volume signals institutional activity or news events "
+            "around Tesla that may provoke Musk to tweet."
+        ),
+        data_source="yfinance TSLA daily OHLCV (data/sources/market/tesla_daily.parquet)",
+        coverage_pct=98.7,
+        expected_range="0.3-3.0",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="tsla_drawdown_5d",
+        category="financial",
+        description="Tesla drawdown from 5-day closing high",
+        formula="(close[t-1] - max(close[t-5:t-1])) / max(close[t-5:t-1])",
+        rationale=(
+            "Stock dropping = defensive tweeting. "
+            "Signal threshold: <-5%."
+        ),
+        data_source="yfinance TSLA daily OHLCV (data/sources/market/tesla_daily.parquet)",
+        coverage_pct=98.7,
+        expected_range="-0.15 to 0.00",
+        eda_signal="Used by SignalEnhancedTailModel (threshold=-0.05)",
+        existing=True,
+        priority="high",
+    ),
+    Factor(
+        name="tsla_gap_1d",
+        category="financial",
+        description="Tesla overnight gap (open vs previous close)",
+        formula="(open[t-1] - close[t-2]) / close[t-2]",
+        rationale=(
+            "Overnight gaps reflect after-hours news. Large gaps may "
+            "indicate events Musk reacts to early in the day."
+        ),
+        data_source="yfinance TSLA daily OHLCV (data/sources/market/tesla_daily.parquet)",
+        coverage_pct=98.7,
+        expected_range="-0.05 to +0.05",
+        existing=True,
+        priority="low",
+    ),
+    Factor(
+        name="doge_pct_change_1d",
+        category="financial",
+        description="Dogecoin 1-day percentage price change",
+        formula="(close[t-1] - close[t-2]) / close[t-2]",
+        rationale=(
+            "DOGE pump/dump = Elon crypto tweet storm. "
+            "Signal threshold: >5% daily move."
+        ),
+        data_source="yfinance DOGE-USD (data/sources/market/crypto_daily.parquet)",
+        coverage_pct=98.7,
+        expected_range="-0.15 to +0.15",
+        eda_signal="Used by SignalEnhancedTailModel (threshold=0.05)",
+        existing=True,
+        priority="high",
+    ),
+    Factor(
+        name="doge_pct_change_5d",
+        category="financial",
+        description="Dogecoin 5-day cumulative return",
+        formula="(close[t-1] - close[t-5]) / close[t-5]",
+        rationale=(
+            "Medium-term DOGE momentum. Sustained DOGE moves often "
+            "accompany sustained Musk engagement on crypto topics."
+        ),
+        data_source="yfinance DOGE-USD (data/sources/market/crypto_daily.parquet)",
+        coverage_pct=98.7,
+        expected_range="-0.30 to +0.30",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="doge_volatility_5d",
+        category="financial",
+        description="Dogecoin 5-day realized volatility (std of daily returns)",
+        formula="std(pct_change[t-5:t-1])",
+        rationale=(
+            "High DOGE volatility indicates crypto market turbulence "
+            "that may trigger Musk tweets about crypto/memes."
+        ),
+        data_source="yfinance DOGE-USD (data/sources/market/crypto_daily.parquet)",
+        coverage_pct=98.7,
+        expected_range="0.02-0.12",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="btc_pct_change_1d",
+        category="financial",
+        description="Bitcoin 1-day percentage price change",
+        formula="(close[t-1] - close[t-2]) / close[t-2]",
+        rationale=(
+            "Broader crypto market context. BTC moves often accompany "
+            "DOGE moves."
+        ),
+        data_source="yfinance BTC-USD (data/sources/market/crypto_daily.parquet)",
+        coverage_pct=98.7,
+        expected_range="-0.10 to +0.10",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="btc_pct_change_5d",
+        category="financial",
+        description="Bitcoin 5-day cumulative return",
+        formula="(close[t-1] - close[t-5]) / close[t-5]",
+        rationale=(
+            "Medium-term BTC trend. Provides context for whether "
+            "DOGE moves are crypto-wide or DOGE-specific."
+        ),
+        data_source="yfinance BTC-USD (data/sources/market/crypto_daily.parquet)",
+        coverage_pct=98.7,
+        expected_range="-0.15 to +0.15",
+        existing=True,
+        priority="low",
+    ),
+    Factor(
+        name="btc_volatility_5d",
+        category="financial",
+        description="Bitcoin 5-day realized volatility (std of daily returns)",
+        formula="std(pct_change[t-5:t-1])",
+        rationale=(
+            "Broad crypto volatility regime indicator. High BTC vol "
+            "signals turbulent crypto markets overall."
+        ),
+        data_source="yfinance BTC-USD (data/sources/market/crypto_daily.parquet)",
+        coverage_pct=98.7,
+        expected_range="0.01-0.06",
+        existing=True,
+        priority="low",
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# ATTENTION factors (~8)
+# Derived from Wikipedia pageviews via Wikimedia REST API
+# ---------------------------------------------------------------------------
+ATTENTION_FACTORS: List[Factor] = [
+    Factor(
+        name="wiki_elon_musk_7d",
+        category="attention",
+        description="7-day average daily pageviews for the Elon_Musk Wikipedia article",
+        formula="mean(pageviews['Elon_Musk'][t-7:t-1])",
+        rationale=(
+            "Public attention proxy. Average ~61.5K/day. "
+            "Spikes during controversies."
+        ),
+        data_source="Wikimedia REST API (data/sources/wikipedia/pageviews.json)",
+        coverage_pct=98.7,
+        expected_range="20000-120000 views/day",
+        existing=True,
+        priority="high",
+    ),
+    Factor(
+        name="wiki_elon_musk_delta",
+        category="attention",
+        description=(
+            "Elon Musk pageview spike: (3-day avg - 7-day avg) / 7-day avg"
+        ),
+        formula="(mean(pv[t-3:t-1]) - mean(pv[t-7:t-1])) / mean(pv[t-7:t-1])",
+        rationale=(
+            "Attention spike detector. Signal threshold: >15% above "
+            "7-day avg = spike."
+        ),
+        data_source="Wikimedia REST API (data/sources/wikipedia/pageviews.json)",
+        coverage_pct=98.7,
+        expected_range="-0.30 to +1.00",
+        eda_signal="Used by SignalEnhancedTailModel (threshold=0.15)",
+        existing=True,
+        priority="high",
+    ),
+    Factor(
+        name="wiki_tesla_7d",
+        category="attention",
+        description="7-day average daily pageviews for the Tesla_Inc Wikipedia article",
+        formula="mean(pageviews['Tesla_Inc'][t-7:t-1])",
+        rationale=(
+            "Tesla-specific public attention. Spikes around earnings, "
+            "recalls, and major product announcements."
+        ),
+        data_source="Wikimedia REST API (data/sources/wikipedia/pageviews.json)",
+        coverage_pct=98.7,
+        expected_range="15000-80000 views/day",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="wiki_tesla_delta",
+        category="attention",
+        description="Tesla pageview spike: (3-day avg - 7-day avg) / 7-day avg",
+        formula="(mean(pv[t-3:t-1]) - mean(pv[t-7:t-1])) / mean(pv[t-7:t-1])",
+        rationale=(
+            "Tesla attention spike detector. Sudden interest in Tesla "
+            "may correlate with Musk tweeting about company news."
+        ),
+        data_source="Wikimedia REST API (data/sources/wikipedia/pageviews.json)",
+        coverage_pct=98.7,
+        expected_range="-0.30 to +1.00",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="wiki_doge_7d",
+        category="attention",
+        description="7-day average daily pageviews for the Dogecoin Wikipedia article",
+        formula="mean(pageviews['Dogecoin'][t-7:t-1])",
+        rationale=(
+            "Dogecoin public interest proxy. Spikes during meme cycles "
+            "and Musk crypto tweets."
+        ),
+        data_source="Wikimedia REST API (data/sources/wikipedia/pageviews.json)",
+        coverage_pct=98.7,
+        expected_range="5000-50000 views/day",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="wiki_doge_delta",
+        category="attention",
+        description="Dogecoin pageview spike: (3-day avg - 7-day avg) / 7-day avg",
+        formula="(mean(pv[t-3:t-1]) - mean(pv[t-7:t-1])) / mean(pv[t-7:t-1])",
+        rationale=(
+            "Dogecoin attention spike detector. DOGE interest spikes "
+            "often follow or precede Musk crypto engagement."
+        ),
+        data_source="Wikimedia REST API (data/sources/wikipedia/pageviews.json)",
+        coverage_pct=98.7,
+        expected_range="-0.30 to +1.00",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="wiki_total_7d",
+        category="attention",
+        description=(
+            "Sum of all entity 7-day pageview averages "
+            "(Elon Musk + Tesla + Dogecoin)"
+        ),
+        formula="wiki_elon_musk_7d + wiki_tesla_7d + wiki_doge_7d",
+        rationale=(
+            "Aggregate attention proxy across all Musk-related entities."
+        ),
+        data_source="Wikimedia REST API (data/sources/wikipedia/pageviews.json)",
+        coverage_pct=98.7,
+        expected_range="40000-250000 views/day",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="wiki_attention_concentration",
+        category="attention",
+        description=(
+            "Herfindahl index of pageview attention across entities"
+        ),
+        formula="sum((entity_7d / wiki_total_7d)^2)",
+        rationale=(
+            "Concentrated attention (one entity dominates) vs spread "
+            "attention. High concentration may signal a focused event."
+        ),
+        data_source="Wikimedia REST API (data/sources/wikipedia/pageviews.json)",
+        coverage_pct=98.7,
+        expected_range="0.33-1.0 (0.33=even across 3, 1.0=single entity)",
+        existing=True,
+        priority="low",
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# VIX factors (5) — added to FINANCIAL category
+# Derived from CBOE VIX index via yfinance (^VIX daily OHLCV)
+# ---------------------------------------------------------------------------
+VIX_FACTORS: List[Factor] = [
+    Factor(
+        name="vix_close",
+        category="financial",
+        description="VIX closing value on the day before event start",
+        formula="vix_close[t-1]",
+        rationale=(
+            "Market fear gauge. High VIX (>25) indicates market stress "
+            "that may trigger more Elon tweets about markets/economy."
+        ),
+        data_source="yfinance ^VIX (data/sources/market/vix_daily.parquet)",
+        coverage_pct=98.7,
+        expected_range="10-50",
+        existing=True,
+        priority="high",
+    ),
+    Factor(
+        name="vix_pct_change_1d",
+        category="financial",
+        description="VIX 1-day percentage change",
+        formula="(vix_close[t-1] - vix_close[t-2]) / vix_close[t-2]",
+        rationale="Sudden VIX spikes signal market shocks that may trigger tweets.",
+        data_source="yfinance ^VIX (data/sources/market/vix_daily.parquet)",
+        coverage_pct=98.7,
+        expected_range="-0.20 to +0.30",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="vix_pct_change_5d",
+        category="financial",
+        description="VIX 5-day percentage change",
+        formula="(vix_close[t-1] - vix_close[t-5]) / vix_close[t-5]",
+        rationale="Medium-term fear trend. Sustained VIX rise = ongoing uncertainty.",
+        data_source="yfinance ^VIX (data/sources/market/vix_daily.parquet)",
+        coverage_pct=98.7,
+        expected_range="-0.40 to +0.60",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="vix_level_category",
+        category="financial",
+        description="VIX level category: low (<15), medium (15-25), high (25-35), extreme (>35)",
+        formula="categorize(vix_close[t-1])",
+        rationale="Categorical regime indicator for market stress level.",
+        data_source="yfinance ^VIX (data/sources/market/vix_daily.parquet)",
+        coverage_pct=98.7,
+        expected_range="low/medium/high/extreme (categorical)",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="vix_ma5_ratio",
+        category="financial",
+        description="Ratio of VIX close to its 5-day moving average",
+        formula="vix_close[t-1] / ma5(vix_close)[t-1]",
+        rationale=(
+            "VIX above its MA5 (ratio >1.10) signals acute stress spike. "
+            "Used as signal threshold by SignalEnhancedTailModelV4."
+        ),
+        data_source="yfinance ^VIX (data/sources/market/vix_daily.parquet)",
+        coverage_pct=98.7,
+        expected_range="0.80-1.40",
+        existing=True,
+        priority="high",
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# CRYPTO FEAR & GREED factors (4) — added to FINANCIAL category
+# Derived from alternative.me Crypto Fear & Greed Index API
+# ---------------------------------------------------------------------------
+CRYPTO_FG_FACTORS: List[Factor] = [
+    Factor(
+        name="crypto_fg_value",
+        category="financial",
+        description="Crypto Fear & Greed Index value (0-100) on day before event",
+        formula="fg_value[t-1]",
+        rationale=(
+            "Crypto market sentiment. Extreme fear (<25) or greed (>75) "
+            "often triggers Musk crypto tweets."
+        ),
+        data_source="alternative.me API (data/sources/market/crypto_fear_greed.parquet)",
+        coverage_pct=98.7,
+        expected_range="0-100",
+        existing=True,
+        priority="high",
+    ),
+    Factor(
+        name="crypto_fg_7d_avg",
+        category="financial",
+        description="7-day rolling average of Crypto Fear & Greed Index",
+        formula="mean(fg_value[t-7:t-1])",
+        rationale="Smoothed crypto sentiment baseline.",
+        data_source="alternative.me API (data/sources/market/crypto_fear_greed.parquet)",
+        coverage_pct=98.7,
+        expected_range="10-90",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="crypto_fg_delta",
+        category="financial",
+        description="Crypto F&G momentum: 3-day avg minus 7-day avg",
+        formula="fg_3d_avg - fg_7d_avg",
+        rationale="Rapid sentiment shift detector. Large positive = greed spike.",
+        data_source="alternative.me API (data/sources/market/crypto_fear_greed.parquet)",
+        coverage_pct=98.7,
+        expected_range="-30 to +30",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="crypto_fg_category",
+        category="financial",
+        description="Crypto F&G category: extreme_fear/fear/neutral/greed/extreme_greed",
+        formula="categorize(fg_value[t-1])",
+        rationale="Categorical crypto sentiment regime.",
+        data_source="alternative.me API (data/sources/market/crypto_fear_greed.parquet)",
+        coverage_pct=98.7,
+        expected_range="extreme_fear/fear/neutral/greed/extreme_greed (categorical)",
+        existing=True,
+        priority="low",
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# TRENDS factors (10)
+# Derived from Google Trends via pytrends
+# ---------------------------------------------------------------------------
+TRENDS_FACTORS: List[Factor] = [
+    Factor(
+        name="gt_elon_musk_7d",
+        category="trends",
+        description="7-day average Google Trends interest for 'Elon Musk'",
+        formula="mean(trends['elon_musk'][t-7:t-1])",
+        rationale=(
+            "Google search interest as a public attention proxy. "
+            "Complementary to Wikipedia pageviews — captures different audience."
+        ),
+        data_source="Google Trends via pytrends (data/sources/trends/google_trends.parquet)",
+        coverage_pct=95.0,
+        expected_range="0-100 (relative interest)",
+        existing=True,
+        priority="high",
+    ),
+    Factor(
+        name="gt_elon_musk_delta",
+        category="trends",
+        description="Elon Musk Google Trends spike: (3d avg - 7d avg) / 7d avg",
+        formula="(mean(gt[t-3:t-1]) - mean(gt[t-7:t-1])) / mean(gt[t-7:t-1])",
+        rationale=(
+            "Search interest spike detector. >15% = breaking story. "
+            "Used as signal by SignalEnhancedTailModelV4."
+        ),
+        data_source="Google Trends via pytrends (data/sources/trends/google_trends.parquet)",
+        coverage_pct=95.0,
+        expected_range="-0.50 to +1.00",
+        existing=True,
+        priority="high",
+    ),
+    Factor(
+        name="gt_tesla_7d",
+        category="trends",
+        description="7-day average Google Trends interest for 'Tesla'",
+        formula="mean(trends['tesla'][t-7:t-1])",
+        rationale="Tesla-specific search interest. Spikes around earnings, product launches.",
+        data_source="Google Trends via pytrends (data/sources/trends/google_trends.parquet)",
+        coverage_pct=95.0,
+        expected_range="0-100 (relative interest)",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="gt_tesla_delta",
+        category="trends",
+        description="Tesla Google Trends spike: (3d avg - 7d avg) / 7d avg",
+        formula="(mean(gt[t-3:t-1]) - mean(gt[t-7:t-1])) / mean(gt[t-7:t-1])",
+        rationale="Tesla search interest spike detector.",
+        data_source="Google Trends via pytrends (data/sources/trends/google_trends.parquet)",
+        coverage_pct=95.0,
+        expected_range="-0.50 to +1.00",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="gt_spacex_7d",
+        category="trends",
+        description="7-day average Google Trends interest for 'SpaceX'",
+        formula="mean(trends['spacex'][t-7:t-1])",
+        rationale="SpaceX-specific search interest. Complements launch calendar data.",
+        data_source="Google Trends via pytrends (data/sources/trends/google_trends.parquet)",
+        coverage_pct=95.0,
+        expected_range="0-100 (relative interest)",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="gt_spacex_delta",
+        category="trends",
+        description="SpaceX Google Trends spike: (3d avg - 7d avg) / 7d avg",
+        formula="(mean(gt[t-3:t-1]) - mean(gt[t-7:t-1])) / mean(gt[t-7:t-1])",
+        rationale="SpaceX search interest spike detector.",
+        data_source="Google Trends via pytrends (data/sources/trends/google_trends.parquet)",
+        coverage_pct=95.0,
+        expected_range="-0.50 to +1.00",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="gt_dogecoin_7d",
+        category="trends",
+        description="7-day average Google Trends interest for 'Dogecoin'",
+        formula="mean(trends['dogecoin'][t-7:t-1])",
+        rationale="Dogecoin search interest. Meme coin interest spikes = Musk tweet triggers.",
+        data_source="Google Trends via pytrends (data/sources/trends/google_trends.parquet)",
+        coverage_pct=95.0,
+        expected_range="0-100 (relative interest)",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="gt_dogecoin_delta",
+        category="trends",
+        description="Dogecoin Google Trends spike: (3d avg - 7d avg) / 7d avg",
+        formula="(mean(gt[t-3:t-1]) - mean(gt[t-7:t-1])) / mean(gt[t-7:t-1])",
+        rationale="Dogecoin search interest spike detector.",
+        data_source="Google Trends via pytrends (data/sources/trends/google_trends.parquet)",
+        coverage_pct=95.0,
+        expected_range="-0.50 to +1.00",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="gt_total_7d",
+        category="trends",
+        description="Sum of all entity 7-day Google Trends averages",
+        formula="gt_elon_musk_7d + gt_tesla_7d + gt_spacex_7d + gt_dogecoin_7d",
+        rationale="Aggregate search attention proxy across all Musk-related entities.",
+        data_source="Google Trends via pytrends (data/sources/trends/google_trends.parquet)",
+        coverage_pct=95.0,
+        expected_range="0-400",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="gt_concentration",
+        category="trends",
+        description="Herfindahl index of Google Trends attention across entities",
+        formula="sum((entity_7d / gt_total_7d)^2)",
+        rationale=(
+            "Concentrated search interest vs spread. High = one topic dominates."
+        ),
+        data_source="Google Trends via pytrends (data/sources/trends/google_trends.parquet)",
+        coverage_pct=95.0,
+        expected_range="0.25-1.0",
+        existing=True,
+        priority="low",
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
 # COMPLETE REGISTRY
 # ---------------------------------------------------------------------------
 FACTOR_REGISTRY: List[Factor] = (
     TEMPORAL_FACTORS + MEDIA_FACTORS + CALENDAR_FACTORS
-    + MARKET_FACTORS + CROSS_FACTORS
+    + MARKET_FACTORS + CROSS_FACTORS + FINANCIAL_FACTORS
+    + VIX_FACTORS + CRYPTO_FG_FACTORS + ATTENTION_FACTORS + TRENDS_FACTORS
 )
 
 # Quick-lookup by name
@@ -761,7 +1359,8 @@ def print_factor_summary() -> None:
     print(thin_sep)
 
     idx = 1
-    for category in ["temporal", "media", "calendar", "market", "cross"]:
+    for category in ["temporal", "media", "calendar", "market", "cross",
+                      "financial", "attention", "trends"]:
         factors = FACTORS_BY_CATEGORY.get(category, [])
         if not factors:
             continue
@@ -808,7 +1407,8 @@ def print_factor_summary() -> None:
         high_count, medium_count, low_count))
     print("")
     print("  By category:")
-    for cat in ["temporal", "media", "calendar", "market", "cross"]:
+    for cat in ["temporal", "media", "calendar", "market", "cross",
+             "financial", "attention", "trends"]:
         factors = FACTORS_BY_CATEGORY.get(cat, [])
         print("    {:<12s}: {} factors".format(cat, len(factors)))
 
@@ -854,7 +1454,8 @@ def validate_registry() -> bool:
         print("  PASS: All {} factor names are unique".format(len(names)))
 
     # Check valid categories
-    valid_cats = {"temporal", "media", "calendar", "market", "cross"}
+    valid_cats = {"temporal", "media", "calendar", "market", "cross",
+                   "financial", "attention", "trends"}
     bad_cats = [f.name for f in FACTOR_REGISTRY if f.category not in valid_cats]
     if bad_cats:
         print("  FAIL: Invalid categories for: {}".format(bad_cats))

@@ -1,6 +1,6 @@
 {
-  "version": "2.0",
-  "updated_at": "2026-02-11",
+  "version": "3.0",
+  "updated_at": "2026-02-15",
   "strategies": {
     "tail_boost_primary": {
       "strategy_id": "tail_boost_primary",
@@ -13,7 +13,11 @@
         "max_edge": 0.3,
         "min_bucket_price": 0.02,
         "max_bucket_price": 0.5,
-        "market_types": ["weekly", "daily", "short"],
+        "market_types": [
+          "weekly",
+          "daily",
+          "short"
+        ],
         "min_duration_days": 1,
         "require_temporal_features": true
       },
@@ -50,7 +54,11 @@
         "max_edge": 0.3,
         "min_bucket_price": 0.02,
         "max_bucket_price": 0.5,
-        "market_types": ["weekly", "daily", "short"],
+        "market_types": [
+          "weekly",
+          "daily",
+          "short"
+        ],
         "min_duration_days": 1,
         "require_temporal_features": true
       },
@@ -87,7 +95,11 @@
         "max_edge": 0.3,
         "min_bucket_price": 0.02,
         "max_bucket_price": 0.5,
-        "market_types": ["weekly", "daily", "short"],
+        "market_types": [
+          "weekly",
+          "daily",
+          "short"
+        ],
         "min_duration_days": 1,
         "require_temporal_features": true
       },
@@ -124,7 +136,11 @@
         "max_edge": 0.3,
         "min_bucket_price": 0.02,
         "max_bucket_price": 0.5,
-        "market_types": ["weekly", "daily", "short"],
+        "market_types": [
+          "weekly",
+          "daily",
+          "short"
+        ],
         "min_duration_days": 1,
         "require_temporal_features": true
       },
@@ -161,7 +177,10 @@
         "max_edge": 0.3,
         "min_bucket_price": 0.02,
         "max_bucket_price": 0.5,
-        "market_types": ["daily", "short"],
+        "market_types": [
+          "daily",
+          "short"
+        ],
         "min_duration_days": 1,
         "require_temporal_features": true
       },
@@ -198,7 +217,12 @@
         "max_edge": 1.0,
         "min_bucket_price": 0.0,
         "max_bucket_price": 1.0,
-        "market_types": ["weekly", "daily", "monthly", "short"],
+        "market_types": [
+          "weekly",
+          "daily",
+          "monthly",
+          "short"
+        ],
         "min_duration_days": 1,
         "require_temporal_features": false
       },
@@ -221,6 +245,127 @@
       },
       "created_at": "2026-02-10",
       "notes": "Sanity check. Should never trade."
+    },
+    "signal_enhanced_volume": {
+      "strategy_id": "signal_enhanced_volume",
+      "strategy_name": "Signal-Enhanced Volume (New Best)",
+      "model_id": "signal_enhanced_tail_v3",
+      "status": "paper",
+      "description": "New best strategy by total P&L. TailBoost v3 enhanced with Tesla/crypto/Wikipedia signals. 188 bets at +17.7% ROI, +$395 P&L. Replaces tail_boost_primary as most trusted.",
+      "filters": {
+        "min_edge": 0.02,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": [
+          "weekly",
+          "daily",
+          "short"
+        ],
+        "min_duration_days": 1,
+        "require_temporal_features": false
+      },
+      "sizing": {
+        "kelly_fraction": 0.25,
+        "max_bet_pct": 0.05,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "gold",
+        "n_events": 38,
+        "n_bets": 0,
+        "brier": 0.801097,
+        "roi_pct": 0.0,
+        "notes": "Auto-updated from run_backtest.py"
+      },
+      "created_at": "2026-02-15",
+      "notes": "Highest P&L of any strategy. require_temporal_features=false since financial+attention features have 98.7% coverage."
+    },
+    "signal_enhanced_selective": {
+      "strategy_id": "signal_enhanced_selective",
+      "strategy_name": "Signal-Enhanced Selective (Best ROI)",
+      "model_id": "signal_enhanced_tail_v1",
+      "status": "paper",
+      "description": "Highest ROI strategy: +84.4% on 22 bets at 5% min_edge. Financial/attention signals dramatically improve bet selection when filtering aggressively. Best for capital-constrained deployment.",
+      "filters": {
+        "min_edge": 0.05,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": [
+          "weekly",
+          "daily",
+          "short"
+        ],
+        "min_duration_days": 1,
+        "require_temporal_features": false
+      },
+      "sizing": {
+        "kelly_fraction": 0.25,
+        "max_bet_pct": 0.1,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "all",
+        "n_events": 159,
+        "n_bets": 22,
+        "brier": 0.5915,
+        "roi_pct": 84.4,
+        "pnl": 381.1,
+        "min_edge": 0.05
+      },
+      "created_at": "2026-02-15",
+      "notes": "Best risk-adjusted. Higher max_bet_pct (10%) since fewer but higher-quality bets. Deploy this for paper trading."
+    },
+    "signal_enhanced_v4_volume": {
+      "strategy_id": "signal_enhanced_v4_volume",
+      "strategy_name": "Signal-Enhanced V4 Volume (7-Signal)",
+      "model_id": "signal_enhanced_tail_v4",
+      "status": "paper",
+      "description": "V4 model with 7 signals (VIX + Google Trends + Crypto F&G added). Volume strategy at 2% min_edge. Pending backtest validation.",
+      "filters": {
+        "min_edge": 0.02,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": [
+          "weekly",
+          "daily",
+          "short"
+        ],
+        "min_duration_days": 1,
+        "require_temporal_features": false
+      },
+      "sizing": {
+        "kelly_fraction": 0.25,
+        "max_bet_pct": 0.05,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "bronze",
+        "n_events": 112,
+        "n_bets": 119,
+        "brier": 0.518974,
+        "roi_pct": -14.79,
+        "notes": "Auto-updated from run_backtest.py"
+      },
+      "created_at": "2026-02-15",
+      "notes": "V4 with 7 signals. require_temporal_features=false since financial+attention+trends features have 95%+ coverage."
     }
   }
 }

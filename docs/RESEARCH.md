@@ -2,7 +2,7 @@
 
 **Project**: Predict Elon Musk tweet counts for Polymarket categorical markets.
 **Status**: Research complete. Ready for data pipeline and modeling.
-**Last updated**: 2026-02-09
+**Last updated**: 2026-02-15
 
 ---
 
@@ -92,6 +92,23 @@ A Dutch trader named **Max** reportedly made **$490K+** betting against consensu
 ---
 
 ## 3. Data Sources
+
+| Source | URL / Library | What | Cost |
+|--------|---------------|------|------|
+| **XTracker** | xtracker.polymarket.com | Daily tweet counts (oracle) | Free |
+| **Kaggle** | kaggle.com/datasets/... | Historical tweets 2010-2025 | Free |
+| **Twitter/X API** | developer.x.com | Live tweets (NOT recommended) | $0-5000/mo |
+| **GDELT** | gdeltproject.org | News events mentioning Musk | Free |
+| **SpaceX Launch Library 2** | ll.thespacedevs.com | SpaceX launch schedule | Free |
+| **SEC EDGAR** | sec.gov | Tesla filings | Free |
+| **Flight Tracking** | Various (ADS-B, OpenSky, ElonJet) | Musk jet movements | Free-$10/mo |
+| **Polymarket Data API** | data-api.polymarket.com | Market prices, trades, positions | Free |
+| **Tesla Stock (yfinance)** | yfinance library | TSLA OHLCV + volatility | Free |
+| **Crypto (yfinance)** | yfinance library (DOGE-USD, BTC-USD) | Crypto prices + momentum | Free |
+| **Wikipedia Pageviews** | wikimedia.org/api/rest_v1 | Public attention proxy (5 articles) | Free |
+| **VIX (yfinance)** | yfinance library (^VIX) | Market fear gauge / volatility index | Free |
+| **Crypto Fear & Greed** | api.alternative.me | Crypto sentiment (0-100 daily) | Free |
+| **Google Trends** | pytrends library | Search interest for Musk-related queries | Free |
 
 ### 3.1 XTracker API (Resolution Oracle)
 
@@ -291,6 +308,116 @@ A Dutch trader named **Max** reportedly made **$490K+** betting against consensu
 
 ---
 
+### 3.9 Tesla Stock Data (yfinance)
+
+| Property | Value |
+|----------|-------|
+| **Library** | yfinance (pip install yfinance) |
+| **Cost** | FREE |
+| **Authentication** | None required |
+| **Coverage** | Jan 2024 - present |
+
+**Purpose**: Tesla stock price movements correlate with Musk's tweeting behavior. High volatility or drawdowns trigger defensive/reactive tweeting.
+
+**Data stored**: `data/sources/market/tesla_daily.parquet` -- daily OHLCV + derived features (pct_change, volatility_5d, volume_ma5, gap).
+
+**Feature engineering**: 6 features -- tsla_pct_change_1d, tsla_pct_change_5d, tsla_volatility_5d, tsla_volume_ratio, tsla_drawdown_5d, tsla_gap_1d.
+
+---
+
+### 3.10 Cryptocurrency Data (yfinance)
+
+| Property | Value |
+|----------|-------|
+| **Library** | yfinance (DOGE-USD, BTC-USD) |
+| **Cost** | FREE |
+| **Authentication** | None required |
+| **Coverage** | Jan 2024 - present |
+
+**Purpose**: DOGE price movements are strongly associated with Musk tweeting activity. BTC provides broader crypto market context.
+
+**Data stored**: `data/sources/market/crypto_daily.parquet` -- daily close prices + pct_change for DOGE and BTC.
+
+**Feature engineering**: 6 features -- doge_pct_change_1d, doge_pct_change_5d, doge_volatility_5d, btc_pct_change_1d, btc_pct_change_5d, btc_volatility_5d.
+
+---
+
+### 3.11 Wikipedia Pageviews (Wikimedia REST API)
+
+| Property | Value |
+|----------|-------|
+| **URL** | https://wikimedia.org/api/rest_v1/ |
+| **Cost** | FREE |
+| **Authentication** | None required |
+| **Rate limits** | 200 req/sec |
+| **Coverage** | Jan 2024 - present |
+
+**Purpose**: Wikipedia pageview spikes are a proxy for public attention and interest. When the Elon_Musk article gets more views, he's in the public eye and likely tweeting more.
+
+**Data stored**: `data/sources/wikipedia/pageviews.json` -- daily views for 5 articles (Elon_Musk, Tesla_Inc, SpaceX, Dogecoin, Department_of_Government_Efficiency).
+
+**Feature engineering**: 8 features -- wiki_elon_musk_7d, wiki_elon_musk_delta, wiki_tesla_7d, wiki_tesla_delta, wiki_doge_7d, wiki_doge_delta, wiki_total_7d, wiki_attention_concentration.
+
+---
+
+### 3.12 VIX (CBOE Volatility Index via yfinance)
+
+| Property | Value |
+|----------|-------|
+| **URL** | yfinance library (`^VIX`) |
+| **Cost** | FREE |
+| **Authentication** | None required |
+| **Rate limits** | Standard yfinance limits |
+| **Coverage** | Jan 2024 - present (532 daily rows) |
+
+**Purpose**: The VIX is the market's "fear gauge." When VIX is elevated (>25), markets are stressed and Elon may tweet more about markets/economy. VIX spikes above its 5-day moving average (ratio >1.10) signal acute stress events.
+
+**Data stored**: `data/sources/market/vix_daily.parquet` -- daily OHLCV plus derived features (pct_change, pct_change_5d, ma5, ma5_ratio, level_category).
+
+**Feature engineering**: 5 features -- vix_close, vix_pct_change_1d, vix_pct_change_5d, vix_level_category, vix_ma5_ratio.
+
+---
+
+### 3.13 Crypto Fear & Greed Index (alternative.me)
+
+| Property | Value |
+|----------|-------|
+| **URL** | https://api.alternative.me/fng/?limit=0&format=json |
+| **Cost** | FREE |
+| **Authentication** | None required |
+| **Rate limits** | Generous (no documented limits) |
+| **Coverage** | Jan 2024 - present (776 daily rows) |
+
+**Purpose**: The Crypto Fear & Greed Index (0-100) measures overall crypto market sentiment. Extreme fear (<25) or extreme greed (>75) often trigger Musk crypto-related tweets. The index combines volatility, market momentum, social media, surveys, BTC dominance, and Google Trends data.
+
+**Data stored**: `data/sources/market/crypto_fear_greed.parquet` -- daily values with 7-day and 3-day rolling averages, delta, and category labels.
+
+**Feature engineering**: 4 features -- crypto_fg_value, crypto_fg_7d_avg, crypto_fg_delta, crypto_fg_category.
+
+---
+
+### 3.14 Google Trends (pytrends)
+
+| Property | Value |
+|----------|-------|
+| **URL** | trends.google.com (via pytrends library) |
+| **Cost** | FREE |
+| **Authentication** | None required |
+| **Rate limits** | ~5 requests/minute (15s sleep between windows) |
+| **Coverage** | Jan 2024 - present (777 daily rows) |
+
+**Purpose**: Google search interest for Musk-related queries provides an independent public attention signal. Complementary to Wikipedia pageviews (different audience). Search interest spikes for "Elon Musk" with >15% delta above 7-day average signal breaking stories.
+
+**Queries**: `["Elon Musk", "Tesla", "SpaceX", "Dogecoin", "DOGE government"]`
+
+**Data collection**: Uses overlapping 85-day windows (max for daily granularity) stitched with overlap normalization. Takes ~20 minutes due to rate limiting.
+
+**Data stored**: `data/sources/trends/google_trends.parquet` -- daily relative interest (0-100) for each query.
+
+**Feature engineering**: 10 features -- gt_{query}_7d, gt_{query}_delta for 4 queries, plus gt_total_7d, gt_concentration (HHI).
+
+---
+
 ## 4. Competitor and Inspiration Tools
 
 ### Tracking and Analytics Platforms
@@ -347,6 +474,15 @@ The high variance is the defining characteristic of this prediction problem. Key
 - Distribution is likely right-skewed (occasional extremely high-output weeks)
 - Serial autocorrelation is moderate -- knowing this week's count helps predict next week's, but not enough for the crowd to price correctly
 - Regime shifts (from high-output to low-output or vice versa) are the primary source of market mispricing
+
+### Proven Model Performance (159 events, 21 months)
+
+| Model | Gold ROI | All-Tier ROI | Bets | Key Edge |
+|-------|----------|--------------|------|----------|
+| SignalEnhanced v3 | +66.3% | +17.7% | 188 | Signal-modulated tail boost |
+| TailBoost | +44.4% | +13.9% | 187 | Structural tail underpricing |
+| DurationTail | +67.7% | +13.8% | 133 | Duration-aware tail boost |
+| DurationShrink | +49.7% | +21.5% | 47 | Short event EV shrinkage |
 
 ---
 
@@ -472,4 +608,4 @@ Following lessons learned from the CS2 Esports project: **ALL features must be c
 
 ---
 
-*This document represents the state of research as of 2026-02-09. Data sources and market conditions may change.*
+*This document represents the state of research as of 2026-02-15. Data sources and market conditions may change.*

@@ -1,6 +1,6 @@
 {
-  "version": "3.0",
-  "updated_at": "2026-02-11",
+  "version": "4.0",
+  "updated_at": "2026-02-15",
   "models": {
     "naive_negbin_v1": {
       "model_id": "naive_negbin_v1",
@@ -286,6 +286,107 @@
       "created_at": "2026-02-11",
       "backtest_gold": {"brier": 0.8125, "roi_pct": 30.1, "n_bets": 3, "n_events": 38, "min_edge": 0.02},
       "notes": "+30.1% ROI but only 3 bets. Not statistically meaningful. All other configs negative."
+    },
+    "signal_enhanced_tail_v1": {
+      "model_id": "signal_enhanced_tail_v1",
+      "model_name": "Signal-Enhanced Tail (Financial + Attention)",
+      "module_path": "src.ml.signal_enhanced_model",
+      "class_name": "SignalEnhancedTailModel",
+      "version": "v1",
+      "description": "TailBoost with dynamic signal-based tail intensity. Uses Tesla volatility, DOGE momentum, Wikipedia attention spikes, and Tesla drawdowns to modulate tail boost factor.",
+      "approach": "signal_enhanced_tail",
+      "feature_group": "full",
+      "hyperparameters": {
+        "base_tail_boost": 1.25,
+        "tail_threshold_sd": 0.8,
+        "signal_weight": 0.08,
+        "short_shrink": 0.18
+      },
+      "status": "active",
+      "created_at": "2026-02-15",
+      "backtest_gold": {"brier": 0.8032, "roi_pct": 62.8, "n_bets": 44, "n_events": 38, "min_edge": 0.02, "pnl": 254.2},
+      "backtest_silver": {"brier": 0.6157, "roi_pct": 213.3, "n_bets": 8, "n_events": 9, "pnl": 204.5},
+      "backtest_bronze": {"brier": 0.5177, "roi_pct": -24.6, "n_bets": 88, "n_events": 112, "pnl": -257.0},
+      "backtest_all": {"brier": 0.5915, "roi_pct": 13.1, "n_bets": 140, "n_events": 159, "pnl": 201.7},
+      "backtest_all_5pct": {"roi_pct": 84.4, "n_bets": 22, "pnl": 381.1},
+      "cross_tier_confidence": "HIGH — dominant at 5% min_edge (+84.4% ROI, 22 bets).",
+      "notes": "Best risk-adjusted returns at 5% min_edge. Financial+attention signals improve bet selection quality."
+    },
+    "signal_enhanced_tail_v2": {
+      "model_id": "signal_enhanced_tail_v2",
+      "model_name": "Signal-Enhanced Tail v2 (Higher Base Boost)",
+      "module_path": "src.ml.signal_enhanced_model",
+      "class_name": "SignalEnhancedTailModel",
+      "version": "v2",
+      "description": "Higher base tail boost (1.35) with narrower tail threshold (0.9 SD). Best bronze performance among signal models.",
+      "approach": "signal_enhanced_tail",
+      "feature_group": "full",
+      "hyperparameters": {
+        "base_tail_boost": 1.35,
+        "tail_threshold_sd": 0.9,
+        "signal_weight": 0.10,
+        "short_shrink": 0.20
+      },
+      "status": "active",
+      "created_at": "2026-02-15",
+      "backtest_gold": {"brier": 0.8064, "roi_pct": 67.2, "n_bets": 57, "n_events": 38, "min_edge": 0.02, "pnl": 386.6},
+      "backtest_silver": {"brier": 0.6214, "roi_pct": 185.6, "n_bets": 9, "n_events": 9, "pnl": 187.1},
+      "backtest_bronze": {"brier": 0.5236, "roi_pct": -13.1, "n_bets": 107, "n_events": 112, "pnl": -191.3},
+      "backtest_all": {"brier": 0.5967, "roi_pct": 17.9, "n_bets": 173, "n_events": 159, "pnl": 382.3},
+      "cross_tier_confidence": "HIGH — best bronze performance among signal models (-13.1%).",
+      "notes": "Best bronze-tier performance among new models. Higher bet volume than v1."
+    },
+    "signal_enhanced_tail_v3": {
+      "model_id": "signal_enhanced_tail_v3",
+      "model_name": "Signal-Enhanced Tail v3 (Aggressive Boost)",
+      "module_path": "src.ml.signal_enhanced_model",
+      "class_name": "SignalEnhancedTailModel",
+      "version": "v3",
+      "description": "Highest base boost (1.40) with wide tail threshold (0.8 SD). Highest total P&L of any model. New overall best at 2% min_edge.",
+      "approach": "signal_enhanced_tail",
+      "feature_group": "full",
+      "hyperparameters": {
+        "base_tail_boost": 1.40,
+        "tail_threshold_sd": 0.8,
+        "signal_weight": 0.06,
+        "short_shrink": 0.15
+      },
+      "status": "production",
+      "created_at": "2026-02-15",
+      "backtest_gold": {"brier": 0.8011, "roi_pct": 66.3, "n_bets": 61, "n_events": 38, "min_edge": 0.02, "pnl": 389.3},
+      "backtest_silver": {"brier": 0.6131, "roi_pct": 180.2, "n_bets": 9, "n_events": 9, "pnl": 223.3},
+      "backtest_bronze": {"brier": 0.5188, "roi_pct": -14.3, "n_bets": 118, "n_events": 112, "pnl": -217.8},
+      "backtest_all": {"brier": 0.5916, "roi_pct": 17.7, "n_bets": 188, "n_events": 159, "pnl": 394.9},
+      "cross_tier_confidence": "HIGH — highest total P&L (+$395). 188 bets = strong statistical confidence.",
+      "notes": "NEW BEST MODEL. Beats TailBoost by +30% total P&L. Structural tail edge + financial/attention signal modulation."
+    },
+    "signal_enhanced_tail_v4": {
+      "model_id": "signal_enhanced_tail_v4",
+      "model_name": "Signal-Enhanced Tail v4 (7-Signal Composite)",
+      "module_path": "src.ml.signal_enhanced_model",
+      "class_name": "SignalEnhancedTailModelV4",
+      "version": "v4",
+      "description": "Extends v3 with 3 new signals: VIX stress, Google Trends momentum, Crypto Fear & Greed extremes. 7-signal composite with lower per-signal weight (0.05). Uses VIX, Google Trends, and Crypto F&G data sources.",
+      "approach": "signal_enhanced_tail",
+      "feature_group": "full",
+      "hyperparameters": {
+        "base_tail_boost": 1.40,
+        "tail_threshold_sd": 0.8,
+        "signal_weight": 0.05,
+        "short_shrink": 0.15,
+        "vix_high_threshold": 25.0,
+        "gt_spike_threshold": 0.15,
+        "crypto_fg_extreme_low": 25,
+        "crypto_fg_extreme_high": 75
+      },
+      "status": "active",
+      "created_at": "2026-02-15",
+      "backtest_gold": {"brier": 0.8013, "roi_pct": 65.4, "n_bets": 61, "n_events": 38, "min_edge": 0.02, "pnl": 384.45},
+      "backtest_silver": {"brier": null, "roi_pct": 184.3, "n_bets": 9, "n_events": 9, "pnl": 229.15},
+      "backtest_bronze": {"brier": null, "roi_pct": -14.8, "n_bets": 119, "n_events": 112, "pnl": -224.90},
+      "backtest_all": {"brier": null, "roi_pct": null, "n_bets": 189, "n_events": 159, "pnl": 388.70},
+      "cross_tier_confidence": "HIGH — comparable to v3, 189 bets across 159 events, +$389 total P&L",
+      "notes": "V4 with 7 signals (3 new: VIX, Google Trends, Crypto F&G). Comparable to v3 (+$395). New signals provide marginal improvement on silver tier."
     }
   }
 }

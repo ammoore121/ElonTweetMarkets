@@ -690,6 +690,339 @@ def compute_market_features(
 # ---------------------------------------------------------------------------
 # CROSS-INTERACTION FEATURES (5 new)
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# FINANCIAL FEATURES (Tesla stock + crypto prices)
+# ---------------------------------------------------------------------------
+def compute_financial_features(
+    tesla_data: "pd.DataFrame",
+    crypto_data: "pd.DataFrame",
+    event_start_date: str,
+    vix_data: "pd.DataFrame" = None,
+    crypto_fg_data: "pd.DataFrame" = None,
+) -> dict:
+    """Compute financial market features using only data BEFORE event_start_date.
+
+    Tesla (6 factors):
+        tsla_pct_change_1d, tsla_pct_change_5d, tsla_volatility_5d,
+        tsla_volume_ratio, tsla_drawdown_5d, tsla_gap_1d
+
+    Crypto (6 factors):
+        doge_pct_change_1d, doge_pct_change_5d, doge_volatility_5d,
+        btc_pct_change_1d, btc_pct_change_5d, btc_volatility_5d
+
+    VIX (5 factors):
+        vix_close, vix_pct_change_1d, vix_pct_change_5d,
+        vix_level_category, vix_ma5_ratio
+
+    Crypto Fear & Greed (4 factors):
+        crypto_fg_value, crypto_fg_7d_avg, crypto_fg_delta, crypto_fg_category
+    """
+    import pandas as pd
+
+    features = {
+        "tsla_pct_change_1d": None,
+        "tsla_pct_change_5d": None,
+        "tsla_volatility_5d": None,
+        "tsla_volume_ratio": None,
+        "tsla_drawdown_5d": None,
+        "tsla_gap_1d": None,
+        "doge_pct_change_1d": None,
+        "doge_pct_change_5d": None,
+        "doge_volatility_5d": None,
+        "btc_pct_change_1d": None,
+        "btc_pct_change_5d": None,
+        "btc_volatility_5d": None,
+        # VIX
+        "vix_close": None,
+        "vix_pct_change_1d": None,
+        "vix_pct_change_5d": None,
+        "vix_level_category": None,
+        "vix_ma5_ratio": None,
+        # Crypto Fear & Greed
+        "crypto_fg_value": None,
+        "crypto_fg_7d_avg": None,
+        "crypto_fg_delta": None,
+        "crypto_fg_category": None,
+    }
+
+    if not event_start_date:
+        return features
+
+    # --- Tesla features ---
+    if tesla_data is not None and not tesla_data.empty:
+        prior = tesla_data[tesla_data["date"] < event_start_date].copy()
+        if len(prior) >= 1:
+            last = prior.iloc[-1]
+            pct = last.get("pct_change")
+            if pct is not None and not (isinstance(pct, float) and math.isnan(pct)):
+                features["tsla_pct_change_1d"] = round(float(pct), 6)
+            gap = last.get("gap")
+            if gap is not None and not (isinstance(gap, float) and math.isnan(gap)):
+                features["tsla_gap_1d"] = round(float(gap), 6)
+
+        if len(prior) >= 5:
+            last5 = prior.tail(5)
+            # 5-day return
+            close_5ago = last5.iloc[0].get("close")
+            close_now = last5.iloc[-1].get("close")
+            if close_5ago and close_now and close_5ago > 0:
+                features["tsla_pct_change_5d"] = round(
+                    (float(close_now) - float(close_5ago)) / float(close_5ago), 6
+                )
+            # 5-day volatility
+            vol = last5.get("pct_change")
+            if vol is not None:
+                clean = vol.dropna()
+                if len(clean) >= 2:
+                    features["tsla_volatility_5d"] = round(float(clean.std()), 6)
+            # Volume ratio (last day vs 5-day MA)
+            vol_ma = last5["volume"].mean()
+            if vol_ma > 0:
+                features["tsla_volume_ratio"] = round(
+                    float(last5.iloc[-1]["volume"]) / float(vol_ma), 4
+                )
+            # Drawdown from 5-day high
+            high_5d = last5["close"].max()
+            if high_5d > 0:
+                features["tsla_drawdown_5d"] = round(
+                    (float(last5.iloc[-1]["close"]) - float(high_5d)) / float(high_5d), 6
+                )
+
+    # --- Crypto features ---
+    if crypto_data is not None and not crypto_data.empty:
+        prior = crypto_data[crypto_data["date"] < event_start_date].copy()
+
+        for symbol in ["doge", "btc"]:
+            pct_col = f"{symbol}_pct_change"
+            close_col = f"{symbol}_close"
+            vol_col = f"{symbol}_volatility_5d"
+
+            if len(prior) >= 1:
+                last = prior.iloc[-1]
+                pct = last.get(pct_col)
+                if pct is not None and not (isinstance(pct, float) and math.isnan(pct)):
+                    features[f"{symbol}_pct_change_1d"] = round(float(pct), 6)
+
+            if len(prior) >= 5:
+                last5 = prior.tail(5)
+                # 5-day return
+                c0 = last5.iloc[0].get(close_col)
+                c1 = last5.iloc[-1].get(close_col)
+                if c0 and c1 and float(c0) > 0:
+                    features[f"{symbol}_pct_change_5d"] = round(
+                        (float(c1) - float(c0)) / float(c0), 6
+                    )
+                # 5-day volatility
+                pcts = last5.get(pct_col)
+                if pcts is not None:
+                    clean = pcts.dropna()
+                    if len(clean) >= 2:
+                        features[f"{symbol}_volatility_5d"] = round(float(clean.std()), 6)
+
+    # --- VIX features ---
+    if vix_data is not None and not vix_data.empty:
+        prior = vix_data[vix_data["date"] < event_start_date].copy()
+        if len(prior) >= 1:
+            last = prior.iloc[-1]
+            close = last.get("close")
+            if close is not None and not (isinstance(close, float) and math.isnan(close)):
+                features["vix_close"] = round(float(close), 2)
+            pct = last.get("pct_change")
+            if pct is not None and not (isinstance(pct, float) and math.isnan(pct)):
+                features["vix_pct_change_1d"] = round(float(pct), 6)
+            pct5 = last.get("pct_change_5d")
+            if pct5 is not None and not (isinstance(pct5, float) and math.isnan(pct5)):
+                features["vix_pct_change_5d"] = round(float(pct5), 6)
+            cat = last.get("level_category")
+            if cat is not None and cat != "":
+                features["vix_level_category"] = str(cat)
+            ma5r = last.get("ma5_ratio")
+            if ma5r is not None and not (isinstance(ma5r, float) and math.isnan(ma5r)):
+                features["vix_ma5_ratio"] = round(float(ma5r), 4)
+
+    # --- Crypto Fear & Greed features ---
+    if crypto_fg_data is not None and not crypto_fg_data.empty:
+        prior = crypto_fg_data[crypto_fg_data["date"] < event_start_date].copy()
+        if len(prior) >= 1:
+            last = prior.iloc[-1]
+            fg_val = last.get("fg_value")
+            if fg_val is not None and not (isinstance(fg_val, float) and math.isnan(fg_val)):
+                features["crypto_fg_value"] = int(fg_val)
+            fg_7d = last.get("fg_7d_avg")
+            if fg_7d is not None and not (isinstance(fg_7d, float) and math.isnan(fg_7d)):
+                features["crypto_fg_7d_avg"] = round(float(fg_7d), 2)
+            fg_delta = last.get("fg_delta")
+            if fg_delta is not None and not (isinstance(fg_delta, float) and math.isnan(fg_delta)):
+                features["crypto_fg_delta"] = round(float(fg_delta), 2)
+            fg_cat = last.get("fg_category")
+            if fg_cat is not None and fg_cat != "":
+                features["crypto_fg_category"] = str(fg_cat)
+
+    return features
+
+
+# ---------------------------------------------------------------------------
+# ATTENTION FEATURES (Wikipedia pageviews)
+# ---------------------------------------------------------------------------
+def compute_attention_features(
+    wiki_data: dict,
+    event_start_date: str,
+) -> dict:
+    """Compute Wikipedia pageview attention features (PIT-correct).
+
+    Attention (8 factors):
+        wiki_elon_musk_7d, wiki_elon_musk_delta,
+        wiki_tesla_7d, wiki_tesla_delta,
+        wiki_doge_7d, wiki_doge_delta,
+        wiki_total_7d, wiki_attention_concentration
+    """
+    ENTITIES = ["elon_musk", "tesla_inc", "dogecoin"]
+
+    features = {
+        "wiki_elon_musk_7d": None,
+        "wiki_elon_musk_delta": None,
+        "wiki_tesla_7d": None,
+        "wiki_tesla_delta": None,
+        "wiki_doge_7d": None,
+        "wiki_doge_delta": None,
+        "wiki_total_7d": None,
+        "wiki_attention_concentration": None,
+    }
+
+    if not event_start_date or not wiki_data:
+        return features
+
+    short_names = {"elon_musk": "elon_musk", "tesla_inc": "tesla", "dogecoin": "doge"}
+
+    entity_7d_avgs = []
+    for entity in ENTITIES:
+        daily = wiki_data.get(entity, {}).get("daily_views", {})
+        if not daily:
+            continue
+
+        short = short_names[entity]
+
+        # 3-day trailing
+        dates_3 = _trailing_dates(event_start_date, 3)
+        vals_3 = [daily.get(d) for d in dates_3 if d in daily]
+        avg_3 = _safe_mean(vals_3) if vals_3 else None
+
+        # 7-day trailing
+        dates_7 = _trailing_dates(event_start_date, 7)
+        vals_7 = [daily.get(d) for d in dates_7 if d in daily]
+        avg_7 = _safe_mean(vals_7) if vals_7 else None
+
+        if avg_7 is not None:
+            features[f"wiki_{short}_7d"] = round(avg_7, 1)
+            entity_7d_avgs.append(avg_7)
+
+        if avg_3 is not None and avg_7 is not None and avg_7 > 0:
+            features[f"wiki_{short}_delta"] = round((avg_3 - avg_7) / avg_7, 4)
+
+    # Total and concentration
+    if entity_7d_avgs:
+        total = sum(entity_7d_avgs)
+        features["wiki_total_7d"] = round(total, 1)
+        if total > 0:
+            hhi = sum((v / total) ** 2 for v in entity_7d_avgs)
+            features["wiki_attention_concentration"] = round(hhi, 4)
+
+    return features
+
+
+# ---------------------------------------------------------------------------
+# TRENDS FEATURES (Google Trends)
+# ---------------------------------------------------------------------------
+def compute_trends_features(
+    trends_data: "pd.DataFrame",
+    event_start_date: str,
+) -> dict:
+    """Compute Google Trends features using only data BEFORE event_start_date.
+
+    Trends (10 factors):
+        gt_elon_musk_7d, gt_elon_musk_delta,
+        gt_tesla_7d, gt_tesla_delta,
+        gt_spacex_7d, gt_spacex_delta,
+        gt_dogecoin_7d, gt_dogecoin_delta,
+        gt_total_7d, gt_concentration
+    """
+    import pandas as pd
+
+    ENTITIES = ["elon_musk", "tesla", "spacex", "dogecoin"]
+
+    features = {
+        "gt_elon_musk_7d": None,
+        "gt_elon_musk_delta": None,
+        "gt_tesla_7d": None,
+        "gt_tesla_delta": None,
+        "gt_spacex_7d": None,
+        "gt_spacex_delta": None,
+        "gt_dogecoin_7d": None,
+        "gt_dogecoin_delta": None,
+        "gt_total_7d": None,
+        "gt_concentration": None,
+    }
+
+    if not event_start_date or trends_data is None or trends_data.empty:
+        return features
+
+    # Build date->row lookup
+    prior = trends_data[trends_data["date"] < event_start_date].copy()
+    if prior.empty:
+        return features
+
+    date_lookup = dict(zip(prior["date"], range(len(prior))))
+
+    entity_7d_avgs = []
+    for entity in ENTITIES:
+        col = entity  # Column names match entity keys
+
+        if col not in prior.columns:
+            continue
+
+        # 3-day trailing
+        dates_3 = _trailing_dates(event_start_date, 3)
+        vals_3 = []
+        for d in dates_3:
+            if d in date_lookup:
+                idx = date_lookup[d]
+                val = prior.iloc[idx].get(col)
+                if val is not None and not (isinstance(val, float) and math.isnan(val)):
+                    vals_3.append(float(val))
+        avg_3 = _safe_mean(vals_3) if vals_3 else None
+
+        # 7-day trailing
+        dates_7 = _trailing_dates(event_start_date, 7)
+        vals_7 = []
+        for d in dates_7:
+            if d in date_lookup:
+                idx = date_lookup[d]
+                val = prior.iloc[idx].get(col)
+                if val is not None and not (isinstance(val, float) and math.isnan(val)):
+                    vals_7.append(float(val))
+        avg_7 = _safe_mean(vals_7) if vals_7 else None
+
+        if avg_7 is not None:
+            features[f"gt_{entity}_7d"] = round(avg_7, 2)
+            entity_7d_avgs.append(avg_7)
+
+        if avg_3 is not None and avg_7 is not None and avg_7 > 0:
+            features[f"gt_{entity}_delta"] = round((avg_3 - avg_7) / avg_7, 4)
+
+    # Total and concentration (HHI)
+    if entity_7d_avgs:
+        total = sum(entity_7d_avgs)
+        features["gt_total_7d"] = round(total, 2)
+        if total > 0:
+            hhi = sum((v / total) ** 2 for v in entity_7d_avgs)
+            features["gt_concentration"] = round(hhi, 4)
+
+    return features
+
+
+# ---------------------------------------------------------------------------
+# CROSS-INTERACTION FEATURES (5 new)
+# ---------------------------------------------------------------------------
 def compute_cross_features(
     temporal: dict,
     media: dict,

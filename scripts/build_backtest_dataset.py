@@ -279,6 +279,9 @@ def build_backtest(tier_filter=None, slug_filter=None):
         "with_calendar": 0,
         "with_market": 0,
         "with_cross": 0,
+        "with_financial": 0,
+        "with_attention": 0,
+        "with_trends": 0,
     }
 
     for _, event_row in tqdm(events.iterrows(), total=len(events),
@@ -326,6 +329,9 @@ def build_backtest(tier_filter=None, slug_filter=None):
         calendar = all_features.get("calendar", {})
         market = all_features.get("market", {})
         cross = all_features.get("cross", {})
+        financial = all_features.get("financial", {})
+        attention = all_features.get("attention", {})
+        trends = all_features.get("trends", {})
 
         stats["total"] += 1
         if n_price_rows > 0:
@@ -340,6 +346,12 @@ def build_backtest(tier_filter=None, slug_filter=None):
             stats["with_market"] += 1
         if any(v is not None for v in cross.values()):
             stats["with_cross"] += 1
+        if any(v is not None for v in financial.values()):
+            stats["with_financial"] += 1
+        if any(v is not None for v in attention.values()):
+            stats["with_attention"] += 1
+        if any(v is not None for v in trends.values()):
+            stats["with_trends"] += 1
 
         # --- Index entry ---
         index_entries.append({
@@ -359,6 +371,9 @@ def build_backtest(tier_filter=None, slug_filter=None):
             "has_temporal_features": temporal.get("rolling_avg_7d") is not None,
             "has_market_features": market.get("crowd_implied_ev") is not None,
             "has_cross_features": any(v is not None for v in cross.values()),
+            "has_financial_features": any(v is not None for v in financial.values()),
+            "has_attention_features": any(v is not None for v in attention.values()),
+            "has_trends_features": any(v is not None for v in trends.values()),
             "output_dir": str(event_dir),
         })
 
@@ -385,6 +400,9 @@ def build_backtest(tier_filter=None, slug_filter=None):
             "with_calendar_features": stats["with_calendar"],
             "with_market_features": stats["with_market"],
             "with_cross_features": stats["with_cross"],
+            "with_financial_features": stats["with_financial"],
+            "with_attention_features": stats["with_attention"],
+            "with_trends_features": stats["with_trends"],
         },
         "events": index_entries,
     }
@@ -406,6 +424,9 @@ def build_backtest(tier_filter=None, slug_filter=None):
     print("  With calendar features:  {}".format(stats["with_calendar"]))
     print("  With market features:    {}".format(stats["with_market"]))
     print("  With cross features:     {}".format(stats["with_cross"]))
+    print("  With financial features: {}".format(stats["with_financial"]))
+    print("  With attention features: {}".format(stats["with_attention"]))
+    print("  With trends features:    {}".format(stats["with_trends"]))
     print("")
     print("  Output directory:        {}".format(BACKTEST_DIR))
     print("  Index file:              {}".format(INDEX_PATH))

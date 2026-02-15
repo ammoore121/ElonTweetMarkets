@@ -2,10 +2,13 @@
 
 Runs all pipeline steps in order:
     1. Fetch XTracker history (daily tweet counts)
-    2. Fetch current market odds
-    3. Generate signals + place paper trades
-    4. Settle completed events
-    5. Print performance summary
+    1b. Fetch market data (Tesla stock + crypto prices)
+    1c. Fetch Wikipedia pageviews (attention signals)
+    2. Refresh market catalog (fresh token IDs from Gamma API)
+    3. Fetch current market odds (live bucket prices from CLOB)
+    4. Generate signals + place paper trades
+    5. Settle completed events
+    6. Print performance summary
 
 Designed for scheduled execution (e.g., every 6 hours via Task Scheduler or cron).
 
@@ -108,7 +111,108 @@ def main():
         logger.info("Skipping XTracker fetch (--skip-xtracker)")
         results["xtracker"] = True
 
-    # Step 2: Fetch current odds
+    # Step 1b: Fetch market data (Tesla stock + crypto prices)
+    try:
+        from scripts.fetch_market_data import main as fetch_market_data_main
+        results["market_data"] = run_step(
+            "Fetch Market Data", fetch_market_data_main,
+            argv_override=["fetch_market_data.py"],
+        )
+    except ImportError:
+        logger.warning("fetch_market_data.py not importable, skipping")
+        results["market_data"] = False
+    except Exception:
+        logger.warning("Fetch Market Data failed (non-critical), continuing")
+        logger.warning(traceback.format_exc())
+        results["market_data"] = False
+
+    # Step 1c: Fetch Wikipedia pageviews
+    try:
+        from scripts.fetch_wikipedia_pageviews import main as fetch_wikipedia_main
+        results["wikipedia"] = run_step(
+            "Fetch Wikipedia Pageviews", fetch_wikipedia_main,
+            argv_override=["fetch_wikipedia_pageviews.py"],
+        )
+    except ImportError:
+        logger.warning("fetch_wikipedia_pageviews.py not importable, skipping")
+        results["wikipedia"] = False
+    except Exception:
+        logger.warning("Fetch Wikipedia Pageviews failed (non-critical), continuing")
+        logger.warning(traceback.format_exc())
+        results["wikipedia"] = False
+
+    # Step 1d: Fetch VIX data
+    try:
+        from scripts.fetch_vix_data import main as fetch_vix_main
+        results["vix"] = run_step(
+            "Fetch VIX Data", fetch_vix_main,
+            argv_override=["fetch_vix_data.py"],
+        )
+    except ImportError:
+        logger.warning("fetch_vix_data.py not importable, skipping")
+        results["vix"] = False
+    except Exception:
+        logger.warning("Fetch VIX Data failed (non-critical), continuing")
+        logger.warning(traceback.format_exc())
+        results["vix"] = False
+
+    # Step 1e: Fetch Crypto Fear & Greed Index
+    try:
+        from scripts.fetch_crypto_fg import main as fetch_crypto_fg_main
+        results["crypto_fg"] = run_step(
+            "Fetch Crypto Fear & Greed", fetch_crypto_fg_main,
+            argv_override=["fetch_crypto_fg.py"],
+        )
+    except ImportError:
+        logger.warning("fetch_crypto_fg.py not importable, skipping")
+        results["crypto_fg"] = False
+    except Exception:
+        logger.warning("Fetch Crypto Fear & Greed failed (non-critical), continuing")
+        logger.warning(traceback.format_exc())
+        results["crypto_fg"] = False
+
+    # Step 1f: Fetch Google Trends (rate-limited, may take ~20min)
+    try:
+        from scripts.fetch_google_trends import main as fetch_trends_main
+        results["google_trends"] = run_step(
+            "Fetch Google Trends", fetch_trends_main,
+            argv_override=["fetch_google_trends.py"],
+        )
+    except ImportError:
+        logger.warning("fetch_google_trends.py not importable, skipping")
+        results["google_trends"] = False
+    except Exception:
+        logger.warning("Fetch Google Trends failed (non-critical), continuing")
+        logger.warning(traceback.format_exc())
+        results["google_trends"] = False
+
+    # Step 2: Refresh market catalog (fresh token IDs for active events)
+    if not args.skip_odds:
+        try:
+            from scripts.fetch_elon_markets import main as fetch_markets_main
+            results["markets"] = run_step(
+                "Fetch Fresh Markets", fetch_markets_main,
+                argv_override=["fetch_elon_markets.py"],
+            )
+        except ImportError:
+            logger.warning("fetch_elon_markets.py not importable, skipping")
+            results["markets"] = False
+
+        try:
+            from scripts.build_market_catalog import main as build_catalog_main
+            results["catalog"] = run_step(
+                "Build Market Catalog", build_catalog_main,
+                argv_override=["build_market_catalog.py"],
+            )
+        except ImportError:
+            logger.warning("build_market_catalog.py not importable, skipping")
+            results["catalog"] = False
+    else:
+        logger.info("Skipping market refresh (--skip-odds)")
+        results["markets"] = True
+        results["catalog"] = True
+
+    # Step 3: Fetch current odds
     if not args.skip_odds:
         try:
             from scripts.fetch_current_odds import main as fetch_odds_main
@@ -123,7 +227,7 @@ def main():
         logger.info("Skipping odds fetch (--skip-odds)")
         results["odds"] = True
 
-    # Step 3: Generate signals
+    # Step 4: Generate signals
     signal_argv = ["generate_signals.py"]
     if args.dry_run:
         signal_argv.append("--dry-run")
@@ -137,7 +241,7 @@ def main():
         logger.warning("generate_signals.py not importable, skipping")
         results["signals"] = False
 
-    # Step 4: Settle bets
+    # Step 5: Settle bets
     try:
         from scripts.settle_bets import main as settle_main
         results["settlement"] = run_step(
@@ -148,7 +252,7 @@ def main():
         logger.warning("settle_bets.py not importable, skipping")
         results["settlement"] = False
 
-    # Step 5: Performance summary
+    # Step 6: Performance summary
     try:
         from src.paper_trading.tracker import PerformanceTracker
         tracker = PerformanceTracker(

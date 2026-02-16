@@ -1,5 +1,5 @@
 {
-  "version": "3.0",
+  "version": "4.0",
   "updated_at": "2026-02-15",
   "strategies": {
     "tail_boost_primary": {
@@ -366,6 +366,76 @@
       },
       "created_at": "2026-02-15",
       "notes": "V4 with 7 signals. require_temporal_features=false since financial+attention+trends features have 95%+ coverage."
+    },
+    "price_dynamics_primary": {
+      "strategy_id": "price_dynamics_primary",
+      "strategy_name": "Price Dynamics (Primary)",
+      "model_id": "price_dynamics_v1",
+      "status": "paper",
+      "description": "Momentum-following tail boost. Best all-tier performer: +33.1% ROI, 116 bets.",
+      "filters": {
+        "min_edge": 0.02,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": ["weekly", "daily", "short"],
+        "min_duration_days": 1,
+        "require_temporal_features": false
+      },
+      "sizing": {
+        "kelly_fraction": 0.25,
+        "max_bet_pct": 0.05,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "all",
+        "n_events": 159,
+        "n_bets": 116,
+        "roi_pct": 33.1,
+        "total_pnl": 564.24
+      },
+      "created_at": "2026-02-15",
+      "notes": "Requires price_dynamics features in features.json (run analyze_price_dynamics.py first)."
+    },
+    "consensus_primary": {
+      "strategy_id": "consensus_primary",
+      "strategy_name": "Consensus Ensemble (Primary)",
+      "model_id": "consensus_ensemble_v1",
+      "status": "paper",
+      "description": "Best all-tier model: +37.0% ROI, 132 bets, $594 P&L. Blends TailBoost, PriceDynamics, SignalEnhanced v3.",
+      "filters": {
+        "min_edge": 0.02,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": ["weekly", "daily", "short"],
+        "min_duration_days": 1,
+        "require_temporal_features": false
+      },
+      "sizing": {
+        "kelly_fraction": 0.25,
+        "max_bet_pct": 0.05,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "all",
+        "n_events": 159,
+        "n_bets": 132,
+        "roi_pct": 37.0,
+        "total_pnl": 594.26
+      },
+      "created_at": "2026-02-15",
+      "notes": "Requires price_dynamics features. Uses TailBoost(0.30) + PriceDynamics(0.40) + SignalEnhanced v3(0.30)."
     }
   }
 }

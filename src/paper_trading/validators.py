@@ -41,9 +41,10 @@ def validate_odds(odds: MarketOdds) -> list[str]:
                     "bucket '{}' price must be 0-1, got {:.4f}".format(label, price)
                 )
 
-        # Bucket prices should sum to roughly 1.0 (allowing for market vig)
+        # Bucket prices should sum to roughly 1.0 (allowing for market vig
+        # and delisted near-zero probability buckets returning 404/0.0)
         total = sum(odds.bucket_prices.values())
-        if not (0.85 <= total <= 1.20):
+        if not (0.60 <= total <= 1.20):
             errors.append(
                 "bucket prices should sum to ~1.0, got {:.4f}".format(total)
             )

@@ -171,6 +171,39 @@
 
 ---
 
+### Phase 9: Signal-Enhanced Models ✅
+
+- [x] **Task 22: Download financial market data**
+  - Script: `scripts/fetch_market_data.py` (Tesla OHLCV + DOGE-USD + BTC-USD via yfinance)
+  - Output: `data/sources/market/tesla_daily.parquet` (532 rows), `crypto_daily.parquet` (775 rows)
+  - Coverage: Jan 2024 - Feb 2026
+
+- [x] **Task 23: Download Wikipedia pageview data**
+  - Script: `scripts/fetch_wikipedia_pageviews.py` (Wikimedia REST API)
+  - Articles: Elon_Musk, Tesla_Inc, SpaceX, Dogecoin, Department_of_Government_Efficiency
+  - Output: `data/sources/wikipedia/pageviews.json` (776 days each)
+  - Elon Musk avg: 61.5K pageviews/day
+
+- [x] **Task 24: Integrate new features into pipeline**
+  - 12 financial features (Tesla: 6, Crypto: 6) in `src/features/extractors.py`
+  - 8 attention features (Wikipedia pageviews) in `src/features/extractors.py`
+  - Feature builder updated: 72 total features across 7 categories
+  - Coverage: 157/159 events (98.7%) for financial + attention
+
+- [x] **Task 25: Build SignalEnhancedTailModel**
+  - Module: `src/ml/signal_enhanced_model.py`
+  - 3 variants (v1, v2, v3) with different hyperparameters
+  - Dynamic tail boost modulated by 4 signals: TSLA vol, DOGE momentum, Wiki attention spike, TSLA drawdown
+  - v3 new best at 2% min_edge: +$395 P&L across all 159 events (188 bets, +17.7% ROI)
+  - v1 best at 5% min_edge: +$381 P&L (22 bets, +84.4% ROI)
+
+- [x] **Task 26: Register models and strategies**
+  - 3 model entries in model_registry.json (v1, v2, v3)
+  - 2 strategy entries: signal_enhanced_volume (v3, 2% edge), signal_enhanced_selective (v1, 5% edge)
+  - Fixed run_backtest.py to use ModelRegistry.instantiate_model() for correct hyperparameter injection
+
+---
+
 ## MVP Acceptance Criteria ✅ ALL MET
 
 Pipeline is "working" when:
@@ -214,3 +247,133 @@ Pipeline is "working" when:
 | 2026-02-11 | Paper trading pipeline built: fetch_current_odds, generate_signals, settle_bets, cron_pipeline (2,363 lines) |
 | 2026-02-12 | Task list updated to reflect Phase 8 completion. End-to-end pipeline validated: 4/4 steps pass. |
 | 2026-02-12 | Fixed PerBucketModel + MarketAdjustedModel init signatures for registry hyperparameter injection. |
+| 2026-02-15 | Phase 9: Signal-enhanced models. 3 new data sources (Tesla/TSLA, Crypto DOGE+BTC, Wikipedia pageviews) integrated. 72 features across 7 categories. SignalEnhancedTail v3 new best model (+$395 P&L across all tiers). 2 new strategies registered. |
+| 2026-02-15 | Phase 10 planned: 3 new approaches (intra-market arb, price dynamics, cross-market consistency), 6 new data sources, 20+ new features. Goal: high volume + positive expectancy. |
+| 2026-02-15 | **Phase 10 complete**: 3 approaches validated (1 FAIL, 2 PASS). 5 new data fetchers built. ~98 features across 10 categories. 4 new models: PriceDynamics (+33.1% ROI), CrossMarketArb (+55.4% gold), SignalEnhanced v5 (+7.5%), **ConsensusEnsemble (+37.0% ROI, $594 P&L, 132 bets = NEW BEST)**. Registry: 23 models, 11 strategies. |
+
+---
+
+### Phase 10: Volume Scaling — New Edges, Data Sources & Features ✅
+
+**Goal**: Break the volume-ROI tradeoff. Current best: 188 bets at +17.7% ROI. Target: 250+ bets at 25%+ ROI by stacking independent edges.
+**Result**: ConsensusEnsemble achieves 132 bets at +37.0% ROI ($594 P&L). PriceDynamics achieves 116 bets at +33.1% ROI ($564 P&L). Both exceed ROI target.
+
+---
+
+#### 10A: New Approaches (Fail Fast Validation) ✅
+
+##### Approach 1: Intra-Market Arbitrage (Overround Mispricing) — FAIL ❌
+
+- **Verdict**: FAIL — mathematically invalid. `mispricing[i] = price[i] * overround/(1+overround)` is a constant fraction for all buckets. Overround distributes uniformly; no exploitable differential.
+- Mean overround: 2.51% (median 0.97%). Winners are slightly overpriced (+0.006), not underpriced.
+- Script: `scripts/analyze_overround.py`
+- [x] Analysis complete — no model built (signal doesn't exist)
+
+##### Approach 2: Price Dynamics Trading (Intra-Market Momentum) — PASS ✅
+
+- **Verdict**: PASS — strong momentum-following signal. Winners have +0.07 avg momentum vs losers -0.009. Cohen's d = 0.89 (large effect). Rising buckets win 26.4% vs falling 7.4%.
+- **Key insight**: Signal is momentum-FOLLOWING (not contrarian). Crowd adjustments are correct in direction but lag the true probability.
+- Model: `src/ml/price_dynamics_model.py` (PriceDynamicsModel)
+- Features: `price_dynamics` category saved per-event in features.json
+- **Results**: Gold +98.4% (41 bets), Silver +221.6% (5), Bronze -9.7% (70). **ALL +33.1% ROI, $564 P&L, 116 bets.**
+- [x] CLOB data has full multi-snapshot coverage (409 events with ≥48h span)
+- [x] Momentum features computed and saved for 137 events
+- [x] PriceDynamicsModel built and backtested
+- [x] Registered in model_registry.json
+
+##### Approach 3: Cross-Market Consistency Arbitrage (Daily vs Weekly) — PASS (Recent Only) ✅
+
+- **Verdict**: PASS for gold/silver (recent period with daily markets), FAIL on bronze.
+- 73 overlapping daily-weekly pairs found. 39.5% of buckets have >5% divergence.
+- Cheap side wins at 10.8% vs avg price 5.7% (87.9% edge above price).
+- Model: `src/ml/cross_market_model.py` (CrossMarketArbModel)
+- **Results**: Gold +55.4% (32 bets), Silver +384.4% (4), Bronze -60.0% (60). Falls back to tail boost on bronze.
+- [x] Analysis: `scripts/analyze_cross_market.py`
+- [x] CrossMarketArbModel built and backtested
+- [x] Registered in model_registry.json
+
+---
+
+#### 10B: New Data Sources ✅
+
+- [x] **DS1: Order Book Depth** — `scripts/fetch_orderbook.py`. Tested: 121 buckets across 4 active events. Saved to `data/sources/polymarket/orderbook/`.
+- [x] **DS3: Government Calendar** — `scripts/fetch_government_calendar.py`. 142 events (10 exec orders, 112 rules, 19 notices). Federal Register + GovTrack APIs. → `data/sources/government/events.parquet`
+- [x] **DS4: Reddit Activity** — `scripts/fetch_reddit_activity.py`. Arctic Shift API works. 5 subreddits (elonmusk, teslamotors, SpaceX, dogecoin, WSB). → `data/sources/reddit/daily_activity.parquet`. Historical backfill needs extended run.
+- [x] **DS5: Trade History** — `scripts/fetch_trade_history.py`. 56,723 trades from 2 active events ($5.5M volume). CLOB trades API works. → `data/sources/polymarket/trades/`
+- [x] **DS6: Corporate Events** — `scripts/fetch_corporate_events.py`. 64 events (Tesla 48, xAI 7, SpaceX 5, Neuralink 4). yfinance earnings + SEC EDGAR + manual curation. → `data/sources/calendar/corporate_events.parquet`
+- [ ] **DS2: Social Blade** — Deferred (scraping risk, lower priority)
+
+---
+
+#### 10C: New Features ✅
+
+~98 scalar features across 10 categories (was 91 across 8). Added government and corporate as new top-level categories.
+
+##### From Existing Data — DONE ✅
+
+- [x] `market_overround` — sum(prices) - 1.0, measures vig
+- [x] `bucket_relative_mispricing` — per-bucket deviation from fair-share
+- [x] `bucket_position_normalized` — bucket index / total (0=lowest, 1=highest)
+- [x] `price_momentum_24h/48h` — bucket price changes (saved in price_dynamics features)
+- [x] `price_acceleration` — momentum_24h - momentum_48h
+- [x] `bucket_price_volatility_24h` — std of bucket price over 24h
+- [x] `cross_market_daily_weekly_div` — daily vs weekly divergence (cross category)
+- [x] `gdelt_entity_divergence` — Elon vs Tesla news volume divergence (media category)
+- [x] `wikipedia_entity_divergence` — Elon vs Tesla pageview ratio (attention category)
+- [x] `day_of_week_sin/cos` — cyclical day-of-week encoding (temporal category)
+- [x] `hours_until_resolution` — already existed in market features
+
+##### From New Data Sources — DONE ✅
+
+- [x] `govt_event_flag_7d` — binary: any govt event in next 7 days (government category)
+- [x] `govt_event_count_trailing_7d` — count of govt events in past 7 days
+- [x] `govt_exec_order_flag_7d` — binary: executive order in next 7 days
+- [x] `corporate_event_flag_7d` — binary: any corporate event in next 7 days (corporate category)
+- [x] `corporate_event_count_7d` — count of corporate events in window
+- [x] `tesla_earnings_flag_14d` — binary: Tesla earnings within 14 days
+- [ ] Order book features (bid_ask_spread, book_imbalance, total_book_depth) — deferred, no historical data for backtest
+- [ ] Reddit features (reddit_volume_24h, reddit_volume_delta) — deferred, insufficient backfill
+- [ ] Trade history features (whale_trade_count, whale_net_direction, etc.) — deferred, no historical data for backtest
+
+##### Updated Category Counts
+
+- temporal: 14 (+day_of_week_sin, day_of_week_cos)
+- media: 22 (+gdelt_entity_divergence)
+- calendar: 6 (unchanged)
+- **government: 3 (NEW category)**
+- **corporate: 3 (NEW category)**
+- market: 10 (+market_overround, bucket_relative_mispricings)
+- cross: 6 (+cross_market_daily_weekly_div)
+- financial: 21 (unchanged)
+- attention: 9 (+wikipedia_entity_divergence)
+- trends: 10 (unchanged)
+- **price_dynamics: per-bucket features (momentum, acceleration, volatility) — stored separately**
+
+---
+
+#### 10D: Execution Order ✅
+
+**Wave 1 — Validate new approaches** ✅
+- [x] Approach 1: Intra-Market Arb — FAIL (overround is uniform, no signal)
+- [x] Approach 2: Price Dynamics — PASS (+33.1% ROI, 116 bets)
+- [x] Approach 3: Cross-Market Consistency — PASS (gold/silver only, +55.4% gold)
+
+**Wave 2 — New data sources** ✅ (5/6, Social Blade deferred)
+- [x] DS1: Order book depth (fetcher built, 121 buckets tested)
+- [x] DS4: Reddit activity (fetcher built, Arctic Shift API)
+- [x] DS5: Trade history (fetcher built, 56K trades)
+- [x] DS3: Government calendar (142 events fetched)
+- [x] DS6: Corporate events (64 events fetched)
+- [ ] DS2: Social Blade — deferred (scraping risk)
+
+**Wave 3 — Feature engineering** ✅
+- [x] Built 12 features from existing data (extractors.py)
+- [x] Built 6 features from new data (govt + corporate)
+- [x] Integrated into feature_builder.py (government + corporate categories)
+- [x] Rebuilt backtest dataset (159 events, ~98 scalar features)
+
+**Wave 4 — Model integration** ✅
+- [x] ConsensusEnsembleModel: TailBoost(0.30) + PriceDynamics(0.40) + SignalEnhanced v3(0.30) — **NEW BEST: +37.0% ROI, $594 P&L, 132 bets**
+- [x] SignalEnhanced v5: 10 signals (v4 + govt, corporate, momentum) — +7.5% ROI, 119 bets
+- [x] Cross-tier backtested all 4 new models
+- [x] Registered: 23 models (v5.0), 11 strategies (v4.0)

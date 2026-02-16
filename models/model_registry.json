@@ -1,5 +1,5 @@
 {
-  "version": "4.0",
+  "version": "5.0",
   "updated_at": "2026-02-15",
   "models": {
     "naive_negbin_v1": {
@@ -11,10 +11,18 @@
       "description": "Fits NegBin distribution from trailing XTracker daily counts, scales by event duration, computes bucket probabilities. No market data used.",
       "approach": "statistical_distribution",
       "feature_group": "base",
-      "hyperparameters": {"distribution": "negative_binomial", "fallback": "uniform"},
+      "hyperparameters": {
+        "distribution": "negative_binomial",
+        "fallback": "uniform"
+      },
       "status": "deprecated",
       "created_at": "2026-02-10",
-      "backtest_gold": {"brier": 1.05, "roi_pct": -92.6, "n_bets": 38, "n_events": 38},
+      "backtest_gold": {
+        "brier": 1.05,
+        "roi_pct": -92.6,
+        "n_bets": 38,
+        "n_events": 38
+      },
       "notes": "Baseline model. Poor calibration due to regime shifts."
     },
     "crowd_v1": {
@@ -29,7 +37,12 @@
       "hyperparameters": {},
       "status": "active",
       "created_at": "2026-02-10",
-      "backtest_gold": {"brier": 0.8137, "roi_pct": 0.0, "n_bets": 0, "n_events": 38},
+      "backtest_gold": {
+        "brier": 0.8137,
+        "roi_pct": 0.0,
+        "n_bets": 0,
+        "n_events": 38
+      },
       "notes": "Market efficiency baseline. Brier 0.81 is the score to beat."
     },
     "regime_aware_v1": {
@@ -44,7 +57,12 @@
       "hyperparameters": {},
       "status": "deprecated",
       "created_at": "2026-02-10",
-      "backtest_gold": {"brier": 1.30, "roi_pct": -92.0, "n_bets": 38, "n_events": 38},
+      "backtest_gold": {
+        "brier": 1.3,
+        "roi_pct": -92.0,
+        "n_bets": 38,
+        "n_events": 38
+      },
       "notes": "Grossly overestimates tail probabilities. Worse than naive baseline."
     },
     "market_adjusted_v1": {
@@ -60,11 +78,17 @@
         "momentum_strength": 0.16,
         "widen_strength": 0.18,
         "reversion_strength": 0.28,
-        "regime_correction": 0.00
+        "regime_correction": 0.0
       },
       "status": "active",
       "created_at": "2026-02-10",
-      "backtest_gold": {"brier": 0.8004, "roi_pct": -10.3, "n_bets": 5, "n_events": 38, "min_edge": 0.02},
+      "backtest_gold": {
+        "brier": 0.8004,
+        "roi_pct": -10.3,
+        "n_bets": 5,
+        "n_events": 38,
+        "min_edge": 0.02
+      },
       "notes": "Beats crowd by 1.6% Brier. Used as base by PerBucket, Asymmetric, DurationOverlay."
     },
     "ensemble_v1": {
@@ -76,10 +100,18 @@
       "description": "Weighted average of RegimeAware and MarketAdjusted. Regime component adds noise.",
       "approach": "ensemble",
       "feature_group": "full",
-      "hyperparameters": {"regime_weight": 0.10, "adjusted_weight": 0.90},
+      "hyperparameters": {
+        "regime_weight": 0.1,
+        "adjusted_weight": 0.9
+      },
       "status": "deprecated",
       "created_at": "2026-02-10",
-      "backtest_gold": {"brier": 0.80, "roi_pct": 0.0, "n_bets": 0, "n_events": 38},
+      "backtest_gold": {
+        "brier": 0.8,
+        "roi_pct": 0.0,
+        "n_bets": 0,
+        "n_events": 38
+      },
       "notes": "When crowd data present, identical to market_adjusted. Regime component adds noise."
     },
     "per_bucket_v1": {
@@ -93,17 +125,35 @@
       "feature_group": "market_adjusted",
       "hyperparameters": {
         "zscore_alpha": 0.24,
-        "max_correction": 0.30,
+        "max_correction": 0.3,
         "base_momentum_strength": 0.16,
         "base_reversion_strength": 0.28,
         "base_widen_strength": 0.18
       },
       "status": "active",
       "created_at": "2026-02-11",
-      "backtest_gold": {"brier": 0.7993, "roi_pct": 67.6, "n_bets": 12, "n_events": 38, "min_edge": 0.02},
-      "backtest_bronze": {"brier": 0.5233, "roi_pct": -91.9, "n_bets": 95, "n_events": 112, "pnl": -814},
-      "backtest_all": {"brier": 0.5963, "roi_pct": -77.6, "n_bets": 115, "n_events": 159, "pnl": -822},
-      "cross_tier_confidence": "LOW — catastrophic failure on bronze (-92%). Z-score momentum is regime-specific.",
+      "backtest_gold": {
+        "brier": 0.7993,
+        "roi_pct": 67.6,
+        "n_bets": 12,
+        "n_events": 38,
+        "min_edge": 0.02
+      },
+      "backtest_bronze": {
+        "brier": 0.5233,
+        "roi_pct": -91.9,
+        "n_bets": 95,
+        "n_events": 112,
+        "pnl": -814
+      },
+      "backtest_all": {
+        "brier": 0.5963,
+        "roi_pct": -77.6,
+        "n_bets": 115,
+        "n_events": 159,
+        "pnl": -822
+      },
+      "cross_tier_confidence": "LOW \u2014 catastrophic failure on bronze (-92%). Z-score momentum is regime-specific.",
       "notes": "WARNING: Only works in Oct 2025+ high-tweet regime. -92% ROI on bronze. Do not deploy without more gold data."
     },
     "tail_boost_v1": {
@@ -116,18 +166,43 @@
       "approach": "tail_redistribution",
       "feature_group": "market_adjusted",
       "hyperparameters": {
-        "tail_boost_factor": 1.50,
+        "tail_boost_factor": 1.5,
         "tail_threshold_sd": 0.8,
         "center_power": 1.0
       },
       "status": "production",
       "created_at": "2026-02-11",
-      "backtest_gold": {"brier": 0.8022, "roi_pct": 44.4, "n_bets": 60, "n_events": 38, "min_edge": 0.02, "pnl": 248.56},
-      "backtest_silver": {"brier": 0.6282, "roi_pct": 117.5, "n_bets": 9, "n_events": 9, "pnl": 129},
-      "backtest_bronze": {"brier": 0.5123, "roi_pct": -5.0, "n_bets": 118, "n_events": 112, "pnl": -75},
-      "backtest_all": {"brier": 0.5881, "roi_pct": 13.9, "n_bets": 187, "n_events": 159, "pnl": 303},
-      "cross_tier_confidence": "HIGH — only model profitable across all tiers. Structural edge.",
-      "notes": "MOST TRUSTED: 187 bets across 159 events (21 months). +13.9% ROI combined. Crowd systematically underprices tail outcomes — structural inefficiency, not regime-specific."
+      "backtest_gold": {
+        "brier": 0.8022,
+        "roi_pct": 44.4,
+        "n_bets": 60,
+        "n_events": 38,
+        "min_edge": 0.02,
+        "pnl": 248.56
+      },
+      "backtest_silver": {
+        "brier": 0.6282,
+        "roi_pct": 117.5,
+        "n_bets": 9,
+        "n_events": 9,
+        "pnl": 129
+      },
+      "backtest_bronze": {
+        "brier": 0.5123,
+        "roi_pct": -5.0,
+        "n_bets": 118,
+        "n_events": 112,
+        "pnl": -75
+      },
+      "backtest_all": {
+        "brier": 0.5881,
+        "roi_pct": 13.9,
+        "n_bets": 187,
+        "n_events": 159,
+        "pnl": 303
+      },
+      "cross_tier_confidence": "HIGH \u2014 only model profitable across all tiers. Structural edge.",
+      "notes": "MOST TRUSTED: 187 bets across 159 events (21 months). +13.9% ROI combined. Crowd systematically underprices tail outcomes \u2014 structural inefficiency, not regime-specific."
     },
     "duration_tail_v1": {
       "model_id": "duration_tail_v1",
@@ -139,19 +214,44 @@
       "approach": "duration_tail",
       "feature_group": "market_adjusted",
       "hyperparameters": {
-        "short_shrink": 0.20,
+        "short_shrink": 0.2,
         "medium_momentum": 0.15,
-        "long_widen": 1.20,
-        "tail_boost_factor": 1.30,
+        "long_widen": 1.2,
+        "tail_boost_factor": 1.3,
         "tail_threshold_sd": 0.8
       },
       "status": "active",
       "created_at": "2026-02-11",
-      "backtest_gold": {"brier": 0.8016, "roi_pct": 67.7, "n_bets": 43, "n_events": 38, "min_edge": 0.02, "pnl": 289.42},
-      "backtest_silver": {"brier": 0.6261, "roi_pct": 259.2, "n_bets": 6, "n_events": 9, "pnl": 207},
-      "backtest_bronze": {"brier": 0.5198, "roi_pct": -32.0, "n_bets": 84, "n_events": 112, "pnl": -298},
-      "backtest_all": {"brier": 0.5932, "roi_pct": 13.8, "n_bets": 133, "n_events": 159, "pnl": 199},
-      "cross_tier_confidence": "MEDIUM-HIGH — profitable gold+silver, marginal loss bronze. Duration shrink component carries it.",
+      "backtest_gold": {
+        "brier": 0.8016,
+        "roi_pct": 67.7,
+        "n_bets": 43,
+        "n_events": 38,
+        "min_edge": 0.02,
+        "pnl": 289.42
+      },
+      "backtest_silver": {
+        "brier": 0.6261,
+        "roi_pct": 259.2,
+        "n_bets": 6,
+        "n_events": 9,
+        "pnl": 207
+      },
+      "backtest_bronze": {
+        "brier": 0.5198,
+        "roi_pct": -32.0,
+        "n_bets": 84,
+        "n_events": 112,
+        "pnl": -298
+      },
+      "backtest_all": {
+        "brier": 0.5932,
+        "roi_pct": 13.8,
+        "n_bets": 133,
+        "n_events": 159,
+        "pnl": 199
+      },
+      "cross_tier_confidence": "MEDIUM-HIGH \u2014 profitable gold+silver, marginal loss bronze. Duration shrink component carries it.",
       "notes": "Most robust on recent data. 133 bets combined, +13.8% ROI. Duration shrink + tail boost. Momentum component hurts on bronze."
     },
     "duration_shrink_v1": {
@@ -166,15 +266,40 @@
       "hyperparameters": {
         "short_shrink": 0.25,
         "medium_momentum": 0.15,
-        "long_widen": 1.20
+        "long_widen": 1.2
       },
       "status": "active",
       "created_at": "2026-02-11",
-      "backtest_gold": {"brier": 0.8095, "roi_pct": 49.7, "n_bets": 23, "n_events": 38, "min_edge": 0.02, "pnl": 125.43},
-      "backtest_silver": {"brier": 0.6394, "roi_pct": 330.3, "n_bets": 2, "n_events": 9, "pnl": 118},
-      "backtest_bronze": {"brier": 0.5183, "roi_pct": -56.4, "n_bets": 22, "n_events": 112, "pnl": -131},
-      "backtest_all": {"brier": 0.5948, "roi_pct": 21.5, "n_bets": 47, "n_events": 159, "pnl": 112},
-      "cross_tier_confidence": "HIGH — simple structural edge (crowd overestimates short events). Combined +21.5% ROI.",
+      "backtest_gold": {
+        "brier": 0.8095,
+        "roi_pct": 49.7,
+        "n_bets": 23,
+        "n_events": 38,
+        "min_edge": 0.02,
+        "pnl": 125.43
+      },
+      "backtest_silver": {
+        "brier": 0.6394,
+        "roi_pct": 330.3,
+        "n_bets": 2,
+        "n_events": 9,
+        "pnl": 118
+      },
+      "backtest_bronze": {
+        "brier": 0.5183,
+        "roi_pct": -56.4,
+        "n_bets": 22,
+        "n_events": 112,
+        "pnl": -131
+      },
+      "backtest_all": {
+        "brier": 0.5948,
+        "roi_pct": 21.5,
+        "n_bets": 47,
+        "n_events": 159,
+        "pnl": 112
+      },
+      "cross_tier_confidence": "HIGH \u2014 simple structural edge (crowd overestimates short events). Combined +21.5% ROI.",
       "notes": "Simple structural edge. Crowd overestimates short events by ~27%. 47 bets combined at +21.5% ROI."
     },
     "duration_overlay_v1": {
@@ -187,17 +312,36 @@
       "approach": "duration_overlay",
       "feature_group": "market_adjusted",
       "hyperparameters": {
-        "short_shrink": 0.20,
-        "long_widen": 1.10,
-        "tail_boost_factor": 1.30,
+        "short_shrink": 0.2,
+        "long_widen": 1.1,
+        "tail_boost_factor": 1.3,
         "tail_threshold_sd": 0.8
       },
       "status": "active",
       "created_at": "2026-02-11",
-      "backtest_gold": {"brier": 0.7945, "roi_pct": 8.3, "n_bets": 46, "n_events": 38, "min_edge": 0.02, "pnl": 32.56},
-      "backtest_bronze": {"brier": 0.5412, "roi_pct": -20.9, "n_bets": 185, "n_events": 112, "pnl": -391},
-      "backtest_all": {"brier": 0.6065, "roi_pct": -14.4, "n_bets": 244, "n_events": 159, "pnl": -344},
-      "cross_tier_confidence": "MEDIUM — best calibration but net negative across all tiers. MarketAdj base adds regime-specificity.",
+      "backtest_gold": {
+        "brier": 0.7945,
+        "roi_pct": 8.3,
+        "n_bets": 46,
+        "n_events": 38,
+        "min_edge": 0.02,
+        "pnl": 32.56
+      },
+      "backtest_bronze": {
+        "brier": 0.5412,
+        "roi_pct": -20.9,
+        "n_bets": 185,
+        "n_events": 112,
+        "pnl": -391
+      },
+      "backtest_all": {
+        "brier": 0.6065,
+        "roi_pct": -14.4,
+        "n_bets": 244,
+        "n_events": 159,
+        "pnl": -344
+      },
+      "cross_tier_confidence": "MEDIUM \u2014 best calibration but net negative across all tiers. MarketAdj base adds regime-specificity.",
       "notes": "Best Brier (0.7945) on gold but -14.4% combined. MarketAdjusted base component is regime-sensitive."
     },
     "asymmetric_per_bucket_v1": {
@@ -212,15 +356,34 @@
       "hyperparameters": {
         "alpha_down": 0.36,
         "alpha_up": 0.12,
-        "max_correction": 0.40,
+        "max_correction": 0.4,
         "tail_cap_multiplier": 3.5
       },
       "status": "active",
       "created_at": "2026-02-11",
-      "backtest_gold": {"brier": 0.7992, "roi_pct": 152.6, "n_bets": 9, "n_events": 38, "min_edge": 0.02, "pnl": 122.12},
-      "backtest_bronze": {"brier": 0.5228, "roi_pct": -90.5, "n_bets": 90, "n_events": 112, "pnl": -728},
-      "backtest_all": {"brier": 0.5959, "roi_pct": -70.8, "n_bets": 107, "n_events": 159, "pnl": -674},
-      "cross_tier_confidence": "LOW — catastrophic failure on bronze (-91%). Asymmetric z-score is regime-specific.",
+      "backtest_gold": {
+        "brier": 0.7992,
+        "roi_pct": 152.6,
+        "n_bets": 9,
+        "n_events": 38,
+        "min_edge": 0.02,
+        "pnl": 122.12
+      },
+      "backtest_bronze": {
+        "brier": 0.5228,
+        "roi_pct": -90.5,
+        "n_bets": 90,
+        "n_events": 112,
+        "pnl": -728
+      },
+      "backtest_all": {
+        "brier": 0.5959,
+        "roi_pct": -70.8,
+        "n_bets": 107,
+        "n_events": 159,
+        "pnl": -674
+      },
+      "cross_tier_confidence": "LOW \u2014 catastrophic failure on bronze (-91%). Asymmetric z-score is regime-specific.",
       "notes": "WARNING: Highest gold ROI (152.6%) but -91% on bronze. Z-score corrections don't generalize. Use only with caution."
     },
     "power_law_tail_v1": {
@@ -239,7 +402,14 @@
       },
       "status": "active",
       "created_at": "2026-02-11",
-      "backtest_gold": {"brier": 0.8033, "roi_pct": 299.1, "n_bets": 4, "n_events": 38, "min_edge": 0.02, "pnl": 83.18},
+      "backtest_gold": {
+        "brier": 0.8033,
+        "roi_pct": 299.1,
+        "n_bets": 4,
+        "n_events": 38,
+        "min_edge": 0.02,
+        "pnl": 83.18
+      },
       "notes": "Very high ROI but only 4 bets. Not statistically reliable alone."
     },
     "volatility_regime_v1": {
@@ -254,7 +424,13 @@
       "hyperparameters": {},
       "status": "deprecated",
       "created_at": "2026-02-11",
-      "backtest_gold": {"brier": null, "roi_pct": -1.5, "n_bets": null, "n_events": 38, "min_edge": 0.02},
+      "backtest_gold": {
+        "brier": null,
+        "roi_pct": -1.5,
+        "n_bets": null,
+        "n_events": 38,
+        "min_edge": 0.02
+      },
       "notes": "Best config was -1.5% ROI. Volatility sharpening doesn't help."
     },
     "calendar_media_v1": {
@@ -269,7 +445,13 @@
       "hyperparameters": {},
       "status": "deprecated",
       "created_at": "2026-02-11",
-      "backtest_gold": {"brier": 0.8150, "roi_pct": -10.1, "n_bets": 49, "n_events": 38, "min_edge": 0.01},
+      "backtest_gold": {
+        "brier": 0.815,
+        "roi_pct": -10.1,
+        "n_bets": 49,
+        "n_events": 38,
+        "min_edge": 0.01
+      },
       "notes": "Best config (launch-heavy tanh) was -10.1% ROI. Calendar/media alone don't add edge."
     },
     "contrarian_v1": {
@@ -284,7 +466,13 @@
       "hyperparameters": {},
       "status": "deprecated",
       "created_at": "2026-02-11",
-      "backtest_gold": {"brier": 0.8125, "roi_pct": 30.1, "n_bets": 3, "n_events": 38, "min_edge": 0.02},
+      "backtest_gold": {
+        "brier": 0.8125,
+        "roi_pct": 30.1,
+        "n_bets": 3,
+        "n_events": 38,
+        "min_edge": 0.02
+      },
       "notes": "+30.1% ROI but only 3 bets. Not statistically meaningful. All other configs negative."
     },
     "signal_enhanced_tail_v1": {
@@ -304,12 +492,41 @@
       },
       "status": "active",
       "created_at": "2026-02-15",
-      "backtest_gold": {"brier": 0.8032, "roi_pct": 62.8, "n_bets": 44, "n_events": 38, "min_edge": 0.02, "pnl": 254.2},
-      "backtest_silver": {"brier": 0.6157, "roi_pct": 213.3, "n_bets": 8, "n_events": 9, "pnl": 204.5},
-      "backtest_bronze": {"brier": 0.5177, "roi_pct": -24.6, "n_bets": 88, "n_events": 112, "pnl": -257.0},
-      "backtest_all": {"brier": 0.5915, "roi_pct": 13.1, "n_bets": 140, "n_events": 159, "pnl": 201.7},
-      "backtest_all_5pct": {"roi_pct": 84.4, "n_bets": 22, "pnl": 381.1},
-      "cross_tier_confidence": "HIGH — dominant at 5% min_edge (+84.4% ROI, 22 bets).",
+      "backtest_gold": {
+        "brier": 0.8032,
+        "roi_pct": 62.8,
+        "n_bets": 44,
+        "n_events": 38,
+        "min_edge": 0.02,
+        "pnl": 254.2
+      },
+      "backtest_silver": {
+        "brier": 0.6157,
+        "roi_pct": 213.3,
+        "n_bets": 8,
+        "n_events": 9,
+        "pnl": 204.5
+      },
+      "backtest_bronze": {
+        "brier": 0.5177,
+        "roi_pct": -24.6,
+        "n_bets": 88,
+        "n_events": 112,
+        "pnl": -257.0
+      },
+      "backtest_all": {
+        "brier": 0.5915,
+        "roi_pct": 13.1,
+        "n_bets": 140,
+        "n_events": 159,
+        "pnl": 201.7
+      },
+      "backtest_all_5pct": {
+        "roi_pct": 84.4,
+        "n_bets": 22,
+        "pnl": 381.1
+      },
+      "cross_tier_confidence": "HIGH \u2014 dominant at 5% min_edge (+84.4% ROI, 22 bets).",
       "notes": "Best risk-adjusted returns at 5% min_edge. Financial+attention signals improve bet selection quality."
     },
     "signal_enhanced_tail_v2": {
@@ -324,16 +541,41 @@
       "hyperparameters": {
         "base_tail_boost": 1.35,
         "tail_threshold_sd": 0.9,
-        "signal_weight": 0.10,
-        "short_shrink": 0.20
+        "signal_weight": 0.1,
+        "short_shrink": 0.2
       },
       "status": "active",
       "created_at": "2026-02-15",
-      "backtest_gold": {"brier": 0.8064, "roi_pct": 67.2, "n_bets": 57, "n_events": 38, "min_edge": 0.02, "pnl": 386.6},
-      "backtest_silver": {"brier": 0.6214, "roi_pct": 185.6, "n_bets": 9, "n_events": 9, "pnl": 187.1},
-      "backtest_bronze": {"brier": 0.5236, "roi_pct": -13.1, "n_bets": 107, "n_events": 112, "pnl": -191.3},
-      "backtest_all": {"brier": 0.5967, "roi_pct": 17.9, "n_bets": 173, "n_events": 159, "pnl": 382.3},
-      "cross_tier_confidence": "HIGH — best bronze performance among signal models (-13.1%).",
+      "backtest_gold": {
+        "brier": 0.8064,
+        "roi_pct": 67.2,
+        "n_bets": 57,
+        "n_events": 38,
+        "min_edge": 0.02,
+        "pnl": 386.6
+      },
+      "backtest_silver": {
+        "brier": 0.6214,
+        "roi_pct": 185.6,
+        "n_bets": 9,
+        "n_events": 9,
+        "pnl": 187.1
+      },
+      "backtest_bronze": {
+        "brier": 0.5236,
+        "roi_pct": -13.1,
+        "n_bets": 107,
+        "n_events": 112,
+        "pnl": -191.3
+      },
+      "backtest_all": {
+        "brier": 0.5967,
+        "roi_pct": 17.9,
+        "n_bets": 173,
+        "n_events": 159,
+        "pnl": 382.3
+      },
+      "cross_tier_confidence": "HIGH \u2014 best bronze performance among signal models (-13.1%).",
       "notes": "Best bronze-tier performance among new models. Higher bet volume than v1."
     },
     "signal_enhanced_tail_v3": {
@@ -346,18 +588,43 @@
       "approach": "signal_enhanced_tail",
       "feature_group": "full",
       "hyperparameters": {
-        "base_tail_boost": 1.40,
+        "base_tail_boost": 1.4,
         "tail_threshold_sd": 0.8,
         "signal_weight": 0.06,
         "short_shrink": 0.15
       },
       "status": "production",
       "created_at": "2026-02-15",
-      "backtest_gold": {"brier": 0.8011, "roi_pct": 66.3, "n_bets": 61, "n_events": 38, "min_edge": 0.02, "pnl": 389.3},
-      "backtest_silver": {"brier": 0.6131, "roi_pct": 180.2, "n_bets": 9, "n_events": 9, "pnl": 223.3},
-      "backtest_bronze": {"brier": 0.5188, "roi_pct": -14.3, "n_bets": 118, "n_events": 112, "pnl": -217.8},
-      "backtest_all": {"brier": 0.5916, "roi_pct": 17.7, "n_bets": 188, "n_events": 159, "pnl": 394.9},
-      "cross_tier_confidence": "HIGH — highest total P&L (+$395). 188 bets = strong statistical confidence.",
+      "backtest_gold": {
+        "brier": 0.8011,
+        "roi_pct": 66.3,
+        "n_bets": 61,
+        "n_events": 38,
+        "min_edge": 0.02,
+        "pnl": 389.3
+      },
+      "backtest_silver": {
+        "brier": 0.6131,
+        "roi_pct": 180.2,
+        "n_bets": 9,
+        "n_events": 9,
+        "pnl": 223.3
+      },
+      "backtest_bronze": {
+        "brier": 0.5188,
+        "roi_pct": -14.3,
+        "n_bets": 118,
+        "n_events": 112,
+        "pnl": -217.8
+      },
+      "backtest_all": {
+        "brier": 0.5916,
+        "roi_pct": 17.7,
+        "n_bets": 188,
+        "n_events": 159,
+        "pnl": 394.9
+      },
+      "cross_tier_confidence": "HIGH \u2014 highest total P&L (+$395). 188 bets = strong statistical confidence.",
       "notes": "NEW BEST MODEL. Beats TailBoost by +30% total P&L. Structural tail edge + financial/attention signal modulation."
     },
     "signal_enhanced_tail_v4": {
@@ -370,7 +637,7 @@
       "approach": "signal_enhanced_tail",
       "feature_group": "full",
       "hyperparameters": {
-        "base_tail_boost": 1.40,
+        "base_tail_boost": 1.4,
         "tail_threshold_sd": 0.8,
         "signal_weight": 0.05,
         "short_shrink": 0.15,
@@ -381,12 +648,156 @@
       },
       "status": "active",
       "created_at": "2026-02-15",
-      "backtest_gold": {"brier": 0.8013, "roi_pct": 65.4, "n_bets": 61, "n_events": 38, "min_edge": 0.02, "pnl": 384.45},
-      "backtest_silver": {"brier": null, "roi_pct": 184.3, "n_bets": 9, "n_events": 9, "pnl": 229.15},
-      "backtest_bronze": {"brier": null, "roi_pct": -14.8, "n_bets": 119, "n_events": 112, "pnl": -224.90},
-      "backtest_all": {"brier": null, "roi_pct": null, "n_bets": 189, "n_events": 159, "pnl": 388.70},
-      "cross_tier_confidence": "HIGH — comparable to v3, 189 bets across 159 events, +$389 total P&L",
+      "backtest_gold": {
+        "brier": 0.8013,
+        "roi_pct": 65.4,
+        "n_bets": 61,
+        "n_events": 38,
+        "min_edge": 0.02,
+        "pnl": 384.45
+      },
+      "backtest_silver": {
+        "brier": null,
+        "roi_pct": 184.3,
+        "n_bets": 9,
+        "n_events": 9,
+        "pnl": 229.15
+      },
+      "backtest_bronze": {
+        "brier": null,
+        "roi_pct": -14.8,
+        "n_bets": 119,
+        "n_events": 112,
+        "pnl": -224.9
+      },
+      "backtest_all": {
+        "brier": null,
+        "roi_pct": null,
+        "n_bets": 189,
+        "n_events": 159,
+        "pnl": 388.7
+      },
+      "cross_tier_confidence": "HIGH \u2014 comparable to v3, 189 bets across 159 events, +$389 total P&L",
       "notes": "V4 with 7 signals (3 new: VIX, Google Trends, Crypto F&G). Comparable to v3 (+$395). New signals provide marginal improvement on silver tier."
+    },
+    "price_dynamics_v1": {
+      "model_id": "price_dynamics_v1",
+      "model_name": "PriceDynamicsModel",
+      "module_path": "src.ml.price_dynamics_model",
+      "class_name": "PriceDynamicsModel",
+      "version": "v1",
+      "description": "Tail boost + momentum-following using CLOB price history. Winners have positive 24h momentum (rising buckets win 26.4% vs falling 7.4%). Best all-tier model: +33.1% ROI, 116 bets, 4 P&L.",
+      "approach": "tail_boost_momentum",
+      "feature_group": "full",
+      "required_features": [
+        "price_dynamics"
+      ],
+      "hyperparameters": {
+        "base_tail_boost": 1.35,
+        "tail_threshold_sd": 0.8,
+        "momentum_weight": 0.15,
+        "mean_reversion_strength": 0.2,
+        "short_shrink": 0.18
+      },
+      "data_sources": [
+        "polymarket_clob",
+        "xtracker"
+      ],
+      "status": "active",
+      "created_at": "2026-02-15",
+      "notes": "Gold +98.4% (41 bets), Silver +221.6% (5), Bronze -9.7% (70). All-tier +33.1% ROI, 4 P&L. New best overall."
+    },
+    "cross_market_arb_v1": {
+      "model_id": "cross_market_arb_v1",
+      "model_name": "CrossMarketArbModel",
+      "module_path": "src.ml.cross_market_model",
+      "class_name": "CrossMarketArbModel",
+      "version": "v1",
+      "description": "Cross-market consistency arb: adjusts daily bucket probs based on weekly-implied divergence. Falls back to tail boost when no cross-market data. Strong on gold/silver, fails bronze.",
+      "approach": "cross_market_arb",
+      "feature_group": "full",
+      "required_features": [
+        "cross_market"
+      ],
+      "hyperparameters": {
+        "base_tail_boost": 1.3,
+        "tail_threshold_sd": 1.0,
+        "divergence_weight": 0.2,
+        "divergence_threshold": 0.05,
+        "short_shrink": 0.18
+      },
+      "data_sources": [
+        "polymarket_clob",
+        "market_catalog"
+      ],
+      "status": "active",
+      "created_at": "2026-02-15",
+      "notes": "Gold +55.4% (32 bets), Silver +384.4% (4), Bronze -60.0% (60). Strong recent-period signal but fails on bronze."
+    },
+    "signal_enhanced_tail_v5": {
+      "model_id": "signal_enhanced_tail_v5",
+      "model_name": "SignalEnhanced Tail v5",
+      "module_path": "src.ml.signal_enhanced_model",
+      "class_name": "SignalEnhancedTailModelV5",
+      "version": "v5",
+      "description": "10-signal composite (v4 + govt calendar, corporate events, price momentum). Strong gold/silver but fails bronze.",
+      "approach": "signal_enhanced",
+      "feature_group": "full",
+      "required_features": [
+        "financial",
+        "attention",
+        "trends",
+        "government",
+        "corporate",
+        "price_dynamics"
+      ],
+      "hyperparameters": {
+        "signal_weight": 0.04,
+        "max_signal_boost": 0.4
+      },
+      "data_sources": [
+        "xtracker",
+        "polymarket_clob",
+        "yfinance",
+        "wikipedia",
+        "gdelt",
+        "government",
+        "corporate",
+        "trends"
+      ],
+      "status": "active",
+      "created_at": "2026-02-15",
+      "notes": "Gold +72.3% (42), Silver +281.7% (6), Bronze -46.9% (71). ALL +7.5% ROI, 119 bets. V5 adds 3 new signals but bronze regression is worse."
+    },
+    "consensus_ensemble_v1": {
+      "model_id": "consensus_ensemble_v1",
+      "model_name": "ConsensusEnsembleModel",
+      "module_path": "src.ml.consensus_model",
+      "class_name": "ConsensusEnsembleModel",
+      "version": "v1",
+      "description": "Weighted average of TailBoost (0.30), PriceDynamics (0.40), SignalEnhanced v3 (0.30). Best overall P&L and most robust across tiers.",
+      "approach": "ensemble",
+      "feature_group": "full",
+      "required_features": [
+        "price_dynamics",
+        "financial",
+        "attention"
+      ],
+      "hyperparameters": {
+        "weight_tail_boost": 0.3,
+        "weight_price_dynamics": 0.4,
+        "weight_signal_enhanced": 0.3
+      },
+      "data_sources": [
+        "xtracker",
+        "polymarket_clob",
+        "yfinance",
+        "wikipedia",
+        "gdelt"
+      ],
+      "status": "production",
+      "created_at": "2026-02-15",
+      "notes": "Gold +118.5% (43), Silver +161.9% (7), Bronze -3.6% (82). ALL +37.0% ROI, 132 bets, $594 P&L. NEW BEST OVERALL."
     }
   }
 }

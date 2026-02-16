@@ -1,14 +1,23 @@
 """Full paper trading pipeline orchestrator.
 
 Runs all pipeline steps in order:
-    1. Fetch XTracker history (daily tweet counts)
+    1a. Fetch XTracker history (daily tweet counts)
     1b. Fetch market data (Tesla stock + crypto prices)
     1c. Fetch Wikipedia pageviews (attention signals)
-    2. Refresh market catalog (fresh token IDs from Gamma API)
-    3. Fetch current market odds (live bucket prices from CLOB)
-    4. Generate signals + place paper trades
-    5. Settle completed events
-    6. Print performance summary
+    1d. Fetch VIX data (volatility index)
+    1e. Fetch Crypto Fear & Greed index
+    1f. Fetch Google Trends (~20 min, rate limited)
+    1g. Fetch GDELT news volumes/tone
+    1h. Fetch SpaceX launch calendar
+    1i. Fetch government calendar (Federal Register + GovTrack)
+    1j. Fetch corporate events (yfinance + SEC EDGAR)
+    1k. Fetch Reddit activity (daily mode)
+    2.  Refresh market catalog (fresh token IDs from Gamma API)
+    3.  Fetch current market odds (live bucket prices from CLOB)
+    3b. Fetch order book depth (live snapshots)
+    4.  Generate signals + place paper trades
+    5.  Settle completed events
+    6.  Print performance summary
 
 Designed for scheduled execution (e.g., every 6 hours via Task Scheduler or cron).
 
@@ -186,6 +195,81 @@ def main():
         logger.warning(traceback.format_exc())
         results["google_trends"] = False
 
+    # Step 1g: Fetch GDELT news volumes/tone
+    try:
+        from scripts.fetch_gdelt_news import main as fetch_gdelt_main
+        results["gdelt"] = run_step(
+            "Fetch GDELT News", fetch_gdelt_main,
+            argv_override=["fetch_gdelt_news.py"],
+        )
+    except ImportError:
+        logger.warning("fetch_gdelt_news.py not importable, skipping")
+        results["gdelt"] = False
+    except Exception:
+        logger.warning("Fetch GDELT News failed (non-critical), continuing")
+        logger.warning(traceback.format_exc())
+        results["gdelt"] = False
+
+    # Step 1h: Fetch SpaceX launch calendar
+    try:
+        from scripts.fetch_spacex_launches import main as fetch_spacex_main
+        results["spacex"] = run_step(
+            "Fetch SpaceX Launches", fetch_spacex_main,
+            argv_override=["fetch_spacex_launches.py"],
+        )
+    except ImportError:
+        logger.warning("fetch_spacex_launches.py not importable, skipping")
+        results["spacex"] = False
+    except Exception:
+        logger.warning("Fetch SpaceX Launches failed (non-critical), continuing")
+        logger.warning(traceback.format_exc())
+        results["spacex"] = False
+
+    # Step 1i: Fetch government calendar (Federal Register + GovTrack)
+    try:
+        from scripts.fetch_government_calendar import main as fetch_govt_main
+        results["government"] = run_step(
+            "Fetch Government Calendar", fetch_govt_main,
+            argv_override=["fetch_government_calendar.py"],
+        )
+    except ImportError:
+        logger.warning("fetch_government_calendar.py not importable, skipping")
+        results["government"] = False
+    except Exception:
+        logger.warning("Fetch Government Calendar failed (non-critical), continuing")
+        logger.warning(traceback.format_exc())
+        results["government"] = False
+
+    # Step 1j: Fetch corporate events (yfinance + SEC EDGAR)
+    try:
+        from scripts.fetch_corporate_events import main as fetch_corp_main
+        results["corporate"] = run_step(
+            "Fetch Corporate Events", fetch_corp_main,
+            argv_override=["fetch_corporate_events.py"],
+        )
+    except ImportError:
+        logger.warning("fetch_corporate_events.py not importable, skipping")
+        results["corporate"] = False
+    except Exception:
+        logger.warning("Fetch Corporate Events failed (non-critical), continuing")
+        logger.warning(traceback.format_exc())
+        results["corporate"] = False
+
+    # Step 1k: Fetch Reddit activity (daily mode)
+    try:
+        from scripts.fetch_reddit_activity import main as fetch_reddit_main
+        results["reddit"] = run_step(
+            "Fetch Reddit Activity", fetch_reddit_main,
+            argv_override=["fetch_reddit_activity.py", "--mode", "daily"],
+        )
+    except ImportError:
+        logger.warning("fetch_reddit_activity.py not importable, skipping")
+        results["reddit"] = False
+    except Exception:
+        logger.warning("Fetch Reddit Activity failed (non-critical), continuing")
+        logger.warning(traceback.format_exc())
+        results["reddit"] = False
+
     # Step 2: Refresh market catalog (fresh token IDs for active events)
     if not args.skip_odds:
         try:
@@ -226,6 +310,22 @@ def main():
     else:
         logger.info("Skipping odds fetch (--skip-odds)")
         results["odds"] = True
+
+    # Step 3b: Fetch order book depth (requires fresh catalog)
+    if not args.skip_odds:
+        try:
+            from scripts.fetch_orderbook import main as fetch_orderbook_main
+            results["orderbook"] = run_step(
+                "Fetch Order Book", fetch_orderbook_main,
+                argv_override=["fetch_orderbook.py"],
+            )
+        except ImportError:
+            logger.warning("fetch_orderbook.py not importable, skipping")
+            results["orderbook"] = False
+        except Exception:
+            logger.warning("Fetch Order Book failed (non-critical), continuing")
+            logger.warning(traceback.format_exc())
+            results["orderbook"] = False
 
     # Step 4: Generate signals
     signal_argv = ["generate_signals.py"]

@@ -35,6 +35,8 @@ from src.features.extractors import (
     compute_temporal_features,
     compute_media_features,
     compute_calendar_features,
+    compute_government_features,
+    compute_corporate_features,
     compute_market_features,
     compute_cross_features,
     compute_financial_features,
@@ -68,6 +70,10 @@ WIKI_PATH = PROJECT_DIR / "data" / "sources" / "wikipedia" / "pageviews.json"
 VIX_PATH = PROJECT_DIR / "data" / "sources" / "market" / "vix_daily.parquet"
 TRENDS_PATH = PROJECT_DIR / "data" / "sources" / "trends" / "google_trends.parquet"
 CRYPTO_FG_PATH = PROJECT_DIR / "data" / "sources" / "market" / "crypto_fear_greed.parquet"
+GOVT_EVENTS_PATH = PROJECT_DIR / "data" / "sources" / "government" / "events.parquet"
+CORPORATE_EVENTS_PATH = (
+    PROJECT_DIR / "data" / "sources" / "calendar" / "corporate_events.parquet"
+)
 
 # GDELT entity keys (filename stems)
 GDELT_ENTITIES = ["elon_musk", "tesla", "spacex", "neuralink"]
@@ -84,6 +90,7 @@ TEMPORAL_FEATURES = [
     "day_of_week", "cv_14d", "regime_ratio",
     # NEW
     "weekend_ratio_7d",
+    "day_of_week_sin", "day_of_week_cos",
 ]
 
 MEDIA_FEATURES = [
@@ -94,6 +101,7 @@ MEDIA_FEATURES = [
     "elon_musk_tone_1d", "elon_musk_tone_7d",
     # NEW
     "elon_musk_tone_delta", "total_media_vol_7d", "media_vol_concentration",
+    "gdelt_entity_divergence",
 ]
 
 CALENDAR_FEATURES = [
@@ -103,17 +111,31 @@ CALENDAR_FEATURES = [
     "is_holiday_week", "event_duration_days",
 ]
 
+GOVERNMENT_FEATURES = [
+    "govt_event_flag_7d", "govt_event_count_trailing_7d",
+    "govt_exec_order_flag_7d",
+]
+
+CORPORATE_FEATURES = [
+    "corporate_event_flag_7d", "corporate_event_count_7d",
+    "tesla_earnings_flag_14d",
+]
+
 MARKET_FEATURES = [
     "crowd_implied_ev", "crowd_std_dev", "distribution_entropy",
     "n_buckets_with_price", "price_shift_24h",
     # NEW
     "crowd_vs_rolling_avg", "crowd_skewness", "crowd_kurtosis",
+    "market_overround", "hours_until_resolution",
+    "bucket_relative_mispricings", "bucket_position_normalized",
 ]
 
 CROSS_FEATURES = [
     "bad_press_x_low_activity", "launch_busy_x_trend_down",
     "regime_transition_flag", "high_vol_x_high_entropy",
     "momentum_reversal_signal",
+    # NEW
+    "cross_market_daily_weekly_div",
 ]
 
 FINANCIAL_FEATURES = [
@@ -133,6 +155,8 @@ ATTENTION_FEATURES = [
     "wiki_tesla_7d", "wiki_tesla_delta",
     "wiki_doge_7d", "wiki_doge_delta",
     "wiki_total_7d", "wiki_attention_concentration",
+    # NEW
+    "wikipedia_entity_divergence",
 ]
 
 TRENDS_FEATURES = [
@@ -145,6 +169,7 @@ TRENDS_FEATURES = [
 
 ALL_FEATURES = (
     TEMPORAL_FEATURES + MEDIA_FEATURES + CALENDAR_FEATURES
+    + GOVERNMENT_FEATURES + CORPORATE_FEATURES
     + MARKET_FEATURES + CROSS_FEATURES
     + FINANCIAL_FEATURES + ATTENTION_FEATURES + TRENDS_FEATURES
 )
@@ -157,14 +182,15 @@ FEATURE_GROUPS: Dict[str, Dict[str, Any]] = {
             "rolling_std_7d", "rolling_std_14d", "trend_7d",
             "day_of_week", "cv_14d", "regime_ratio",
             "yesterday_count", "weekend_ratio_7d",
+            "day_of_week_sin", "day_of_week_cos",
         ],
         "categories": {"temporal"},
-        "description": "Core temporal features only (12 factors)",
+        "description": "Core temporal features only (14 factors)",
     },
     "full": {
         "features": ALL_FEATURES,
-        "categories": {"temporal", "media", "calendar", "market", "cross", "financial", "attention", "trends"},
-        "description": "All 91 available features across all categories",
+        "categories": {"temporal", "media", "calendar", "government", "corporate", "market", "cross", "financial", "attention", "trends"},
+        "description": "All available features across all categories",
     },
     "market_adjusted": {
         "features": [
@@ -174,30 +200,38 @@ FEATURE_GROUPS: Dict[str, Dict[str, Any]] = {
             # Media
             "elon_musk_vol_7d", "elon_musk_vol_delta",
             "elon_musk_tone_7d", "elon_musk_tone_delta",
-            "total_media_vol_7d",
+            "total_media_vol_7d", "gdelt_entity_divergence",
             # Calendar
             "launches_trailing_7d", "launches_during_event",
             "is_holiday_week", "event_duration_days",
             # Market
             "crowd_implied_ev", "crowd_std_dev", "distribution_entropy",
             "crowd_vs_rolling_avg", "crowd_skewness",
+            "market_overround", "hours_until_resolution",
             # Cross
             "bad_press_x_low_activity", "regime_transition_flag",
-            "momentum_reversal_signal",
+            "momentum_reversal_signal", "cross_market_daily_weekly_div",
             # Financial (new)
             "tsla_pct_change_1d", "tsla_volatility_5d", "tsla_drawdown_5d",
             "doge_pct_change_1d", "doge_volatility_5d",
+            # Temporal (cyclical)
+            "day_of_week_sin", "day_of_week_cos",
             # Attention (new)
             "wiki_elon_musk_7d", "wiki_elon_musk_delta",
+            "wikipedia_entity_divergence",
             # VIX
             "vix_close", "vix_ma5_ratio",
             # Crypto Fear & Greed
             "crypto_fg_value", "crypto_fg_delta",
             # Trends
             "gt_elon_musk_7d", "gt_elon_musk_delta",
+            # Government
+            "govt_event_flag_7d", "govt_exec_order_flag_7d",
+            # Corporate
+            "corporate_event_flag_7d", "tesla_earnings_flag_14d",
         ],
-        "categories": {"temporal", "media", "calendar", "market", "cross", "financial", "attention", "trends"},
-        "description": "Features for market-adjusted predictions (36 factors)",
+        "categories": {"temporal", "media", "calendar", "government", "corporate", "market", "cross", "financial", "attention", "trends"},
+        "description": "Features for market-adjusted predictions",
     },
     "temporal_only": {
         "features": TEMPORAL_FEATURES + CALENDAR_FEATURES,
@@ -359,6 +393,34 @@ def _load_crypto_fg_data() -> pd.DataFrame:
     return pd.read_parquet(CRYPTO_FG_PATH)
 
 
+def _load_govt_events() -> pd.DataFrame:
+    """Load government events from parquet.
+
+    Schema: date, event_type, source, title, description
+    Ensures date column is string (YYYY-MM-DD) for consistent comparisons.
+    """
+    if not GOVT_EVENTS_PATH.exists():
+        return pd.DataFrame()
+    df = pd.read_parquet(GOVT_EVENTS_PATH)
+    if not df.empty and "date" in df.columns:
+        df["date"] = df["date"].astype(str).str[:10]
+    return df
+
+
+def _load_corporate_events() -> pd.DataFrame:
+    """Load corporate events from parquet.
+
+    Schema: date, company, event_type, title, description, expected_tweet_impact
+    Ensures date column is string (YYYY-MM-DD) for consistent comparisons.
+    """
+    if not CORPORATE_EVENTS_PATH.exists():
+        return pd.DataFrame()
+    df = pd.read_parquet(CORPORATE_EVENTS_PATH)
+    if not df.empty and "date" in df.columns:
+        df["date"] = df["date"].astype(str).str[:10]
+    return df
+
+
 def _load_catalog() -> pd.DataFrame:
     """Load market_catalog.parquet."""
     if not CATALOG_PATH.exists():
@@ -431,6 +493,8 @@ class TweetFeatureBuilder:
         self._vix_data: Optional[pd.DataFrame] = None
         self._trends_data: Optional[pd.DataFrame] = None
         self._crypto_fg_data: Optional[pd.DataFrame] = None
+        self._govt_events: Optional[pd.DataFrame] = None
+        self._corporate_events: Optional[pd.DataFrame] = None
 
     # ------------------------------------------------------------------
     # Lazy data source accessors
@@ -500,6 +564,18 @@ class TweetFeatureBuilder:
         if self._crypto_fg_data is None:
             self._crypto_fg_data = _load_crypto_fg_data()
         return self._crypto_fg_data
+
+    @property
+    def govt_events(self) -> pd.DataFrame:
+        if self._govt_events is None:
+            self._govt_events = _load_govt_events()
+        return self._govt_events
+
+    @property
+    def corporate_events(self) -> pd.DataFrame:
+        if self._corporate_events is None:
+            self._corporate_events = _load_corporate_events()
+        return self._corporate_events
 
     # ------------------------------------------------------------------
     # Category need checks
@@ -572,6 +648,24 @@ class TweetFeatureBuilder:
             calendar = {}
         result["calendar"] = calendar
 
+        # --- 3b. Government features ---
+        if self._needs("government"):
+            government = compute_government_features(
+                self.govt_events, start_date
+            )
+        else:
+            government = {}
+        result["government"] = government
+
+        # --- 3c. Corporate features ---
+        if self._needs("corporate"):
+            corporate = compute_corporate_features(
+                self.corporate_events, start_date, end_date
+            )
+        else:
+            corporate = {}
+        result["corporate"] = corporate
+
         # --- 4. Market features (depends on temporal + calendar for cross-refs) ---
         if self._needs("market"):
             market = compute_market_features(
@@ -581,6 +675,7 @@ class TweetFeatureBuilder:
                 end_date,
                 temporal_features=temporal,
                 calendar_features=calendar,
+                event_start_date=start_date,
             )
         else:
             market = {}

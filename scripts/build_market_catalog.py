@@ -684,13 +684,25 @@ def main():
     print(f"\nTotal rows before dedup: {len(all_rows)}")
     df = pd.DataFrame(all_rows)
 
-    # Deduplicate by (event_id, bucket_label) - prefer comprehensive source
-    source_priority = {
+    # Deduplicate by (event_id, bucket_label)
+    # For resolved events: prefer comprehensive (most complete historical data)
+    # For unresolved events: prefer full (freshest token IDs from API)
+    source_priority_resolved = {
         "tweet_events_comprehensive.json": 0,
         "elon_tweet_markets_full.json": 1,
         "elon_tweet_clob_markets.json": 2,
     }
-    df["_priority"] = df["source_file"].map(source_priority)
+    source_priority_unresolved = {
+        "elon_tweet_markets_full.json": 0,
+        "tweet_events_comprehensive.json": 1,
+        "elon_tweet_clob_markets.json": 2,
+    }
+    df["_priority"] = df.apply(
+        lambda row: source_priority_resolved.get(row["source_file"], 9)
+        if row["is_resolved"]
+        else source_priority_unresolved.get(row["source_file"], 9),
+        axis=1,
+    )
     df = df.sort_values("_priority").drop_duplicates(
         subset=["event_id", "bucket_idx"], keep="first"
     )

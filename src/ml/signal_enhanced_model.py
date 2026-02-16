@@ -311,3 +311,108 @@ class SignalEnhancedTailModelV4(SignalEnhancedTailModel):
             "crypto_fg_extreme_high": self.CRYPTO_FG_EXTREME_HIGH,
         })
         return params
+
+
+class SignalEnhancedTailModelV5(SignalEnhancedTailModelV4):
+    """V5: 10-signal composite adding government, corporate, and price momentum.
+
+    Extends V4's 7-signal approach with 3 new signals from Wave 4 features.
+    Uses lower per-signal weight (0.04 vs 0.05) since there are now 10 signals
+    instead of 7.
+
+    Signal composite (10 signals, 0-1 each):
+        1. Tesla volatility (existing) -- tsla_volatility_5d > 0.03
+        2. DOGE momentum (existing) -- |doge_pct_change_1d| > 0.05
+        3. Wikipedia spike (existing) -- wiki_elon_musk_delta > 0.15
+        4. Tesla drawdown (existing) -- tsla_drawdown_5d < -0.05
+        5. VIX stress (existing) -- vix_close > 25 OR vix_ma5_ratio > 1.10
+        6. Google Trends momentum (existing) -- gt_elon_musk_delta > 0.15
+        7. Crypto Fear & Greed extreme (existing) -- fg_value < 25 OR > 75
+        8. Government event (NEW) -- govt_event_flag_7d == 1
+        9. Corporate event (NEW) -- corporate_event_flag_7d == 1
+        10. Price momentum (NEW) -- mean_momentum_24h > 0 (crowd moving = uncertainty)
+    """
+
+    # Adjusted for 10 signals
+    SIGNAL_WEIGHT = 0.04
+    MAX_SIGNAL_BOOST = 0.40  # 10 signals * 0.04
+
+    # New signal thresholds
+    PRICE_MOMENTUM_THRESHOLD = 0.005  # Minimum absolute momentum to trigger
+
+    def __init__(
+        self,
+        name: str = "signal_enhanced_tail",
+        version: str = "v5",
+        base_tail_boost: float = None,
+        tail_threshold_sd: float = None,
+        signal_weight: float = None,
+        short_shrink: float = None,
+        vix_high_threshold: float = None,
+        gt_spike_threshold: float = None,
+        crypto_fg_extreme_low: float = None,
+        crypto_fg_extreme_high: float = None,
+        price_momentum_threshold: float = None,
+    ):
+        super().__init__(
+            name=name,
+            version=version,
+            base_tail_boost=base_tail_boost,
+            tail_threshold_sd=tail_threshold_sd,
+            signal_weight=signal_weight,
+            short_shrink=short_shrink,
+            vix_high_threshold=vix_high_threshold,
+            gt_spike_threshold=gt_spike_threshold,
+            crypto_fg_extreme_low=crypto_fg_extreme_low,
+            crypto_fg_extreme_high=crypto_fg_extreme_high,
+        )
+        if price_momentum_threshold is not None:
+            self.PRICE_MOMENTUM_THRESHOLD = price_momentum_threshold
+
+    def _compute_signal_score(self, features: dict) -> float:
+        """Compute 10-signal composite score.
+
+        Returns a value in [0, 10] where each signal contributes 0-1.
+        """
+        # Start with the 7 existing signals from parent (V4)
+        score = super()._compute_signal_score(features)
+
+        government = features.get("government", {})
+        corporate = features.get("corporate", {})
+        price_dynamics = features.get("price_dynamics", {})
+
+        # Signal 8: Government event in trailing 7 days
+        govt_flag = government.get("govt_event_flag_7d")
+        if govt_flag is not None and govt_flag == 1:
+            score += 1.0
+
+        # Signal 9: Corporate event in trailing 7 days
+        corp_flag = corporate.get("corporate_event_flag_7d")
+        if corp_flag is not None and corp_flag == 1:
+            score += 1.0
+
+        # Signal 10: Price momentum (positive = crowd moving = uncertainty)
+        event_level = price_dynamics.get("event_level", {})
+        mean_momentum = event_level.get("mean_momentum_24h")
+        if mean_momentum is not None:
+            mean_momentum = float(mean_momentum)
+            abs_mom = abs(mean_momentum)
+            if abs_mom > self.PRICE_MOMENTUM_THRESHOLD:
+                # Proportional activation: threshold -> 0, 2x threshold -> 1
+                score += min(1.0, abs_mom / (self.PRICE_MOMENTUM_THRESHOLD * 2))
+
+        return score
+
+    def get_config(self) -> dict:
+        config = super().get_config()
+        config.update({
+            "price_momentum_threshold": self.PRICE_MOMENTUM_THRESHOLD,
+        })
+        return config
+
+    def get_hyperparameters(self) -> dict:
+        params = super().get_hyperparameters()
+        params.update({
+            "price_momentum_threshold": self.PRICE_MOMENTUM_THRESHOLD,
+        })
+        return params

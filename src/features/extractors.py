@@ -8,11 +8,13 @@ BEFORE the event start date is used (except calendar features that look
 at the event window itself, e.g. launches_during_event).
 
 Categories:
-    temporal  - Rolling averages, volatility, trends, regime indicators
-    media     - GDELT news volume and tone signals
-    calendar  - SpaceX launches, holidays, event duration
-    market    - Crowd-derived signals from Polymarket prices
-    cross     - Interaction features combining multiple raw signals
+    temporal   - Rolling averages, volatility, trends, regime indicators
+    media      - GDELT news volume and tone signals
+    calendar   - SpaceX launches, holidays, event duration
+    government - Government events (exec orders, rules, notices)
+    corporate  - Corporate events (earnings, launches, filings)
+    market     - Crowd-derived signals from Polymarket prices
+    cross      - Interaction features combining multiple raw signals
 
 Ported from scripts/build_backtest_dataset.py (22 existing factors)
 plus 14 new factors defined in src/features/factor_registry.py.
@@ -173,6 +175,8 @@ def compute_temporal_features(
         "regime_ratio": None,
         # NEW
         "weekend_ratio_7d": None,
+        "day_of_week_sin": None,
+        "day_of_week_cos": None,
     }
 
     if not xtracker_daily or not event_start_date:
@@ -181,7 +185,10 @@ def compute_temporal_features(
     # Day of week
     try:
         start_dt = datetime.strptime(event_start_date, "%Y-%m-%d")
-        features["day_of_week"] = start_dt.weekday()
+        dow = start_dt.weekday()
+        features["day_of_week"] = dow
+        features["day_of_week_sin"] = round(math.sin(2 * math.pi * dow / 7), 4)
+        features["day_of_week_cos"] = round(math.cos(2 * math.pi * dow / 7), 4)
     except ValueError:
         pass
 
@@ -314,6 +321,7 @@ def compute_media_features(
         features["elon_musk_tone_delta"] = None
         features["total_media_vol_7d"] = None
         features["media_vol_concentration"] = None
+        features["gdelt_entity_divergence"] = None
         return features
 
     for entity in ENTITIES:
@@ -396,6 +404,21 @@ def compute_media_features(
     else:
         features["total_media_vol_7d"] = None
         features["media_vol_concentration"] = None
+
+    # --- NEW: gdelt_entity_divergence ---
+    # abs(elon_vol_1d - tesla_vol_1d) / max(elon_vol_1d, tesla_vol_1d)
+    elon_vol = features.get("elon_musk_vol_1d")
+    tesla_vol = features.get("tesla_vol_1d")
+    if elon_vol is not None and tesla_vol is not None:
+        max_vol = max(elon_vol, tesla_vol)
+        if max_vol > 0:
+            features["gdelt_entity_divergence"] = round(
+                abs(elon_vol - tesla_vol) / max_vol, 4
+            )
+        else:
+            features["gdelt_entity_divergence"] = None
+    else:
+        features["gdelt_entity_divergence"] = None
 
     return features
 
@@ -485,6 +508,119 @@ def compute_calendar_features(
 
 
 # ---------------------------------------------------------------------------
+# GOVERNMENT EVENT FEATURES (3 new)
+# ---------------------------------------------------------------------------
+def compute_government_features(
+    govt_events_df: "pd.DataFrame",
+    event_start_date: str,
+) -> dict:
+    """Compute government event features using only data BEFORE event_start_date.
+
+    Government (3 factors):
+        govt_event_flag_7d        - Binary: any govt event in 7 days before event start
+        govt_event_count_trailing_7d - Count of govt events in 7 days before event start
+        govt_exec_order_flag_7d   - Binary: any executive order in 7 days before event start
+    """
+    features = {
+        "govt_event_flag_7d": 0,
+        "govt_event_count_trailing_7d": 0,
+        "govt_exec_order_flag_7d": 0,
+    }
+
+    if not event_start_date or govt_events_df is None or govt_events_df.empty:
+        return features
+
+    try:
+        start_dt = datetime.strptime(event_start_date, "%Y-%m-%d")
+    except ValueError:
+        return features
+
+    window_start = (start_dt - timedelta(days=7)).strftime("%Y-%m-%d")
+
+    # Filter events in the 7-day window before event start
+    mask = (govt_events_df["date"] >= window_start) & (govt_events_df["date"] < event_start_date)
+    window_events = govt_events_df[mask]
+
+    count = len(window_events)
+    features["govt_event_count_trailing_7d"] = count
+    features["govt_event_flag_7d"] = 1 if count > 0 else 0
+
+    # Check for executive orders specifically
+    if count > 0 and "event_type" in window_events.columns:
+        exec_orders = window_events[window_events["event_type"] == "executive_order"]
+        features["govt_exec_order_flag_7d"] = 1 if len(exec_orders) > 0 else 0
+
+    return features
+
+
+# ---------------------------------------------------------------------------
+# CORPORATE EVENT FEATURES (3 new)
+# ---------------------------------------------------------------------------
+def compute_corporate_features(
+    corporate_events_df: "pd.DataFrame",
+    event_start_date: str,
+    event_end_date: Optional[str] = None,
+) -> dict:
+    """Compute corporate event features around the event window.
+
+    Corporate (3 factors):
+        corporate_event_flag_7d   - Binary: any corporate event in 7d around event window
+        corporate_event_count_7d  - Count of corporate events in 7d around event window
+        tesla_earnings_flag_14d   - Binary: Tesla earnings within 14d of event start
+    """
+    features = {
+        "corporate_event_flag_7d": 0,
+        "corporate_event_count_7d": 0,
+        "tesla_earnings_flag_14d": 0,
+    }
+
+    if not event_start_date or corporate_events_df is None or corporate_events_df.empty:
+        return features
+
+    try:
+        start_dt = datetime.strptime(event_start_date, "%Y-%m-%d")
+    except ValueError:
+        return features
+
+    # 7-day window around the event (before start to after end, or +7d if no end)
+    window_start = (start_dt - timedelta(days=7)).strftime("%Y-%m-%d")
+    if event_end_date:
+        try:
+            end_dt = datetime.strptime(event_end_date, "%Y-%m-%d")
+            window_end = (end_dt + timedelta(days=7)).strftime("%Y-%m-%d")
+        except ValueError:
+            window_end = (start_dt + timedelta(days=7)).strftime("%Y-%m-%d")
+    else:
+        window_end = (start_dt + timedelta(days=7)).strftime("%Y-%m-%d")
+
+    # Filter corporate events in 7d window around event
+    mask = (
+        (corporate_events_df["date"] >= window_start)
+        & (corporate_events_df["date"] <= window_end)
+    )
+    window_events = corporate_events_df[mask]
+
+    count = len(window_events)
+    features["corporate_event_count_7d"] = count
+    features["corporate_event_flag_7d"] = 1 if count > 0 else 0
+
+    # Tesla earnings within 14 days (before or after) of event start
+    earnings_window_start = (start_dt - timedelta(days=14)).strftime("%Y-%m-%d")
+    earnings_window_end = (start_dt + timedelta(days=14)).strftime("%Y-%m-%d")
+
+    earnings_mask = (
+        (corporate_events_df["date"] >= earnings_window_start)
+        & (corporate_events_df["date"] <= earnings_window_end)
+        & (corporate_events_df["company"] == "Tesla")
+        & (corporate_events_df["event_type"] == "earnings")
+    )
+    tesla_earnings = corporate_events_df[earnings_mask]
+    features["tesla_earnings_flag_14d"] = 1 if len(tesla_earnings) > 0 else 0
+
+    return features
+
+
+# ---------------------------------------------------------------------------
 # MARKET-DERIVED FEATURES (5 existing + 3 new = 8 total)
 # ---------------------------------------------------------------------------
 def compute_market_features(
@@ -494,6 +630,7 @@ def compute_market_features(
     event_end_date: str,
     temporal_features: Optional[dict] = None,
     calendar_features: Optional[dict] = None,
+    event_start_date: Optional[str] = None,
 ) -> dict:
     """Compute market-derived features at T-24h before event end.
 
@@ -501,10 +638,14 @@ def compute_market_features(
         crowd_implied_ev, crowd_std_dev, distribution_entropy,
         n_buckets_with_price, price_shift_24h
 
-    New (3):
-        crowd_vs_rolling_avg - (crowd_ev - rolling_avg*duration) / crowd_ev
-        crowd_skewness       - skewness of crowd probability distribution
-        crowd_kurtosis       - excess kurtosis of crowd probability distribution
+    New (7):
+        crowd_vs_rolling_avg       - (crowd_ev - rolling_avg*duration) / crowd_ev
+        crowd_skewness             - skewness of crowd probability distribution
+        crowd_kurtosis             - excess kurtosis of crowd probability distribution
+        market_overround           - sum(bucket_prices) - 1.0 (vig in market)
+        hours_until_resolution     - hours from event start to market close
+        bucket_relative_mispricings - per-bucket: price[i] - price[i]/sum(prices)
+        bucket_position_normalized - per-bucket: bucket_index / total_buckets
 
     Args:
         prices_df: Price history DataFrame (all events).
@@ -513,6 +654,7 @@ def compute_market_features(
         event_end_date: Event end date string (YYYY-MM-DD).
         temporal_features: Temporal features dict (for cross-referencing rolling_avg).
         calendar_features: Calendar features dict (for event_duration_days).
+        event_start_date: Event start date string (YYYY-MM-DD) for hours_until_resolution.
     """
     import pandas as pd
 
@@ -526,6 +668,10 @@ def compute_market_features(
         "crowd_vs_rolling_avg": None,
         "crowd_skewness": None,
         "crowd_kurtosis": None,
+        "market_overround": None,
+        "hours_until_resolution": None,
+        "bucket_relative_mispricings": None,
+        "bucket_position_normalized": None,
     }
 
     if prices_df is None or prices_df.empty:
@@ -683,6 +829,43 @@ def compute_market_features(
         features["crowd_vs_rolling_avg"] = round(
             (implied_ev - expected_from_rolling) / implied_ev, 4
         )
+
+    # --- NEW: market_overround ---
+    # Sum of raw (unnormalized) bucket prices minus 1.0
+    features["market_overround"] = round(float(price_sum) - 1.0, 4)
+
+    # --- NEW: hours_until_resolution ---
+    # Hours from event start to event end (market close)
+    if event_start_date and event_end_date:
+        try:
+            start_dt_utc = pd.Timestamp(event_start_date, tz="UTC")
+            end_dt_utc = pd.Timestamp(event_end_date, tz="UTC")
+            hours_diff = (end_dt_utc - start_dt_utc).total_seconds() / 3600.0
+            if hours_diff > 0:
+                features["hours_until_resolution"] = round(hours_diff, 1)
+        except Exception:
+            pass
+
+    # --- NEW: bucket_relative_mispricings ---
+    # Per-bucket: raw_price[i] - (raw_price[i] / sum(raw_prices))
+    # This shows how much each bucket deviates from its fair-share of 1.0
+    mispricings = {}
+    sorted_merged = merged.sort_values("lower_bound")
+    for _, row in sorted_merged.iterrows():
+        label = row["bucket_label"]
+        raw_price = float(row["price"])
+        fair_share = raw_price / price_sum  # normalized probability
+        mispricings[label] = round(raw_price - fair_share, 4)
+    features["bucket_relative_mispricings"] = mispricings
+
+    # --- NEW: bucket_position_normalized ---
+    # Per-bucket: index / total_buckets (0=lowest, ~1=highest)
+    n_total = len(sorted_merged)
+    positions = {}
+    for idx, (_, row) in enumerate(sorted_merged.iterrows()):
+        label = row["bucket_label"]
+        positions[label] = round(idx / max(n_total - 1, 1), 4)
+    features["bucket_position_normalized"] = positions
 
     return features
 
@@ -887,6 +1070,8 @@ def compute_attention_features(
         "wiki_doge_delta": None,
         "wiki_total_7d": None,
         "wiki_attention_concentration": None,
+        # NEW
+        "wikipedia_entity_divergence": None,
     }
 
     if not event_start_date or not wiki_data:
@@ -926,6 +1111,37 @@ def compute_attention_features(
         if total > 0:
             hhi = sum((v / total) ** 2 for v in entity_7d_avgs)
             features["wiki_attention_concentration"] = round(hhi, 4)
+
+    # --- NEW: wikipedia_entity_divergence ---
+    # elon_pageviews / tesla_pageviews ratio (7d) vs 30d average of that ratio
+    # Spike in this ratio without Tesla = personal event
+    elon_daily = wiki_data.get("elon_musk", {}).get("daily_views", {})
+    tesla_daily = wiki_data.get("tesla_inc", {}).get("daily_views", {})
+
+    if elon_daily and tesla_daily:
+        # 7-day ratio
+        dates_7 = _trailing_dates(event_start_date, 7)
+        elon_7 = [elon_daily.get(d) for d in dates_7 if d in elon_daily]
+        tesla_7 = [tesla_daily.get(d) for d in dates_7 if d in tesla_daily]
+        avg_elon_7 = _safe_mean(elon_7) if elon_7 else None
+        avg_tesla_7 = _safe_mean(tesla_7) if tesla_7 else None
+
+        # 30-day ratio (baseline)
+        dates_30 = _trailing_dates(event_start_date, 30)
+        ratios_30 = []
+        for d in dates_30:
+            e_val = elon_daily.get(d)
+            t_val = tesla_daily.get(d)
+            if e_val is not None and t_val is not None and t_val > 0:
+                ratios_30.append(e_val / t_val)
+        avg_ratio_30 = _safe_mean(ratios_30) if ratios_30 else None
+
+        if (avg_elon_7 is not None and avg_tesla_7 is not None
+                and avg_tesla_7 > 0 and avg_ratio_30 is not None and avg_ratio_30 > 0):
+            current_ratio = avg_elon_7 / avg_tesla_7
+            features["wikipedia_entity_divergence"] = round(
+                current_ratio / avg_ratio_30, 4
+            )
 
     return features
 
@@ -1045,6 +1261,8 @@ def compute_cross_features(
         "regime_transition_flag": None,
         "high_vol_x_high_entropy": None,
         "momentum_reversal_signal": None,
+        # NEW
+        "cross_market_daily_weekly_div": 0,
     }
 
     # --- bad_press_x_low_activity ---

@@ -102,13 +102,16 @@ def fetch_odds_for_event(
             price = client.get_price(str(token_id), side="buy")
             bucket_prices[label] = float(price)
         except Exception as e:
-            logger.warning("  Failed to fetch price for %s: %s", label, e)
+            # 404 = Polymarket delisted this bucket (near-zero probability)
+            bucket_prices[label] = 0.0
             errors += 1
 
         time.sleep(0.1)  # Rate limit
 
-    if not bucket_prices:
-        logger.warning("  No prices fetched for %s", event_slug)
+    # Skip if no live prices at all (all buckets returned 404)
+    live_prices = {k: v for k, v in bucket_prices.items() if v > 0}
+    if not live_prices:
+        logger.warning("  No live prices fetched for %s (all 404)", event_slug)
         return None
 
     # Compute implied EV

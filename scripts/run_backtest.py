@@ -38,7 +38,10 @@ from src.backtesting.engine import BacktestEngine
 from src.ml.baseline_model import NaiveBucketModel, CrowdModel
 from src.ml.advanced_models import RegimeAwareModel, MarketAdjustedModel, EnsembleModel
 from src.ml.per_bucket_model import PerBucketModel
-from src.ml.signal_enhanced_model import SignalEnhancedTailModel, SignalEnhancedTailModelV4
+from src.ml.signal_enhanced_model import SignalEnhancedTailModel, SignalEnhancedTailModelV4, SignalEnhancedTailModelV5
+from src.ml.price_dynamics_model import PriceDynamicsModel
+from src.ml.cross_market_model import CrossMarketArbModel
+from src.ml.consensus_model import ConsensusEnsembleModel
 from src.ml.registry import ModelRegistry, StrategyRegistry
 
 # ---------------------------------------------------------------------------
@@ -61,6 +64,10 @@ MODEL_MAP = {
     "perbucket": PerBucketModel,
     "signal_enhanced": SignalEnhancedTailModel,
     "signal_enhanced_v4": SignalEnhancedTailModelV4,
+    "signal_enhanced_v5": SignalEnhancedTailModelV5,
+    "price_dynamics": PriceDynamicsModel,
+    "cross_market_arb": CrossMarketArbModel,
+    "consensus_ensemble": ConsensusEnsembleModel,
 }
 
 # Maps model_id from registry to MODEL_MAP key for instantiation
@@ -75,6 +82,10 @@ MODEL_ID_TO_KEY = {
     "signal_enhanced_tail_v2": "signal_enhanced",
     "signal_enhanced_tail_v3": "signal_enhanced",
     "signal_enhanced_tail_v4": "signal_enhanced_v4",
+    "signal_enhanced_tail_v5": "signal_enhanced_v5",
+    "price_dynamics_v1": "price_dynamics",
+    "cross_market_arb_v1": "cross_market_arb",
+    "consensus_ensemble_v1": "consensus_ensemble",
 }
 
 

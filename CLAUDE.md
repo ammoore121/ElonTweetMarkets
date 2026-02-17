@@ -1,7 +1,7 @@
 # Elon Musk Tweet Count Prediction Markets
 
 **Goal**: ML models to predict Elon Musk's daily/weekly tweet counts for Polymarket betting.
-**Current State**: Paper trading phase -- 19 models registered, 7 profitable, pipeline runs every 6h.
+**Current State**: Paper trading phase -- 26 models registered (2 XGBoost ML + 24 heuristic), 10 active paper strategies, pipeline runs every 6h.
 **Market**: Categorical prediction (multiple buckets of tweet count ranges).
 **Backtest**: 159 events across 3 tiers (gold 38, silver 9, bronze 112), 21 months of data.
 
@@ -13,9 +13,10 @@
 2. **This is NOT binary prediction**: Markets have 10-30 outcome buckets (tweet count ranges)
 3. **XTracker is the oracle**: All markets resolve via https://xtracker.polymarket.com
 4. **11 data sources active**: XTracker, Kaggle, GDELT, SpaceX, Polymarket CLOB, Tesla (yfinance), Crypto (yfinance), Wikipedia pageviews, VIX (yfinance), Crypto Fear & Greed (alternative.me), Google Trends (pytrends)
-5. **91 features across 8 categories**: temporal (12), media (21), calendar (6), market (8), cross (5), financial (21), attention (8), trends (10)
-6. **Twitter API is NOT needed**: Free tier is write-only. Use Kaggle + XTracker instead.
-7. **See [docs/RESEARCH.md](docs/RESEARCH.md)** for detailed data source documentation
+5. **113 features across 11 categories**: temporal (14), media (22), calendar (6), government (3), corporate (3), market (12), cross (6), financial (21), attention (9), trends (10), reddit (7)
+6. **XGBoost ML models available**: `XGBoostResidualModel` (+28.4% ROI walk-forward CV) and `XGBoostBucketModel`. Train with `scripts/train_xgb_model.py`
+7. **Twitter API is NOT needed**: Free tier is write-only. Use Kaggle + XTracker instead.
+8. **See [docs/RESEARCH.md](docs/RESEARCH.md)** for detailed data source documentation
 
 ---
 
@@ -43,7 +44,14 @@ python scripts/build_backtest_dataset.py            # Build unified backtest dat
 python scripts/run_backtest.py --model naive --tier gold     # Single model backtest
 python scripts/run_backtest.py --strategy tail_boost_primary  # Strategy backtest
 python scripts/run_backtest.py --all                          # All tiers
+python scripts/run_backtest.py --model xgb_residual --all    # XGBoost residual (must train first)
+python scripts/run_backtest.py --model xgb_residual --all --cv  # Walk-forward CV
 python scripts/test_new_features.py                           # Cross-tier model comparison
+
+# XGBoost ML training
+python scripts/train_xgb_model.py                            # Train + walk-forward CV
+python scripts/train_xgb_model.py --compare                  # CV comparison vs heuristics
+python scripts/train_xgb_model.py --retrain                  # Retrain on ALL data for production
 
 # Paper trading (production)
 python scripts/cron_pipeline.py                     # Full automated pipeline (every 6h)
@@ -62,7 +70,8 @@ Markets have multiple outcome buckets (e.g., 0-19, 20-39, 40-59, ..., 740+).
 Must predict probability distribution across all buckets, not a single number.
 
 **Proven approaches**: Tail-redistribution models (move mass from center to tails),
-duration-aware shrinkage, signal-enhanced crowd adjustment. See `src/ml/` for implementations.
+duration-aware shrinkage, signal-enhanced crowd adjustment, XGBoost residual correction.
+See `src/ml/` for implementations.
 
 ### 2. XTracker is the Resolution Oracle
 
@@ -139,18 +148,21 @@ wager = bankroll * kelly_fraction * 0.25  # Quarter Kelly
 
 ## Model Performance (Cross-Tier Validated)
 
-Top strategies at 2% min_edge, backtested on 159 events across 21 months:
+Top models at 2% min_edge. Walk-forward CV on 159 events (5 folds, temporal integrity):
 
-| Strategy | Gold ROI | Gold Bets | All-Tier ROI | All-Tier P&L | Notes |
-|----------|----------|-----------|--------------|-------------|-------|
-| **SignalEnhanced v3** | +66.3% | 61 | Best overall | +$395 | Highest P&L across all tiers |
-| **DurationTail** | +67.7% | 43 | +13.8% | +$199 | Strong gold performance |
-| **DurationShrink** | +49.7% | 23 | +21.5% | +$112 | Fewest bets, high conviction |
-| **TailBoost** | +44.4% | 60 | +13.9% | +$303 | Most trusted, structural edge, 187 bets all tiers |
-| **SignalEnhanced v4** | +65.4% | 61 | ~+13% | +$389 | 7 signals (VIX+Trends+F&G), 189 bets all tiers |
+| Model | CV Bets | CV P&L | CV ROI | Type | Notes |
+|-------|---------|--------|--------|------|-------|
+| **XGBoost Residual** | 161 | +$826 | **+28.4%** | ML (trained) | Learns corrections to crowd prices |
+| **ConsensusEnsemble** | 159 | +$377 | +21.7% | Heuristic | TailBoost + PriceDynamics + SignalEnhanced |
+| **SignalEnhanced v3** | 105 | +$22 | +1.9% | Heuristic | Highest heuristic P&L on single-pass backtest |
+| **TailBoost** | 67 | -$233 | -36.1% | Heuristic | Most trusted structural edge (but weaker in CV) |
 
-**Key insight**: Only tail-redistribution models survive out-of-sample. Z-score / momentum
-models overfit to the current regime and fail on bronze tier (pre-Oct 2025 data).
+**Key insight**: Residual framing >> raw classification. Crowd is strong (Brier 0.81);
+learning corrections is more tractable than predicting from scratch. XGBoost Residual is
+the first ML model to beat heuristics on honest walk-forward CV.
+
+**Top features** (XGBoost importance): crowd_price (12.2%), heuristic_prob (6.3%),
+elon_musk_vol_3d (3.4%), heuristic_edge (3.1%), tesla_vol (1.9%), launches_trailing_7d (1.6%)
 
 ---
 
@@ -190,7 +202,7 @@ python scripts/cron_pipeline.py                  # Runs fetch_current_odds + gen
 src/
   features/
     feature_builder.py    # TweetFeatureBuilder - unified feature pipeline
-    extractors.py         # 7 feature categories (temporal, media, calendar, market, cross, financial, attention)
+    extractors.py         # 11 feature categories (temporal, media, calendar, government, corporate, market, cross, financial, attention, trends, reddit)
     factor_registry.py    # 36+ documented factors
   ml/
     base_model.py         # BasePredictionModel ABC
@@ -199,7 +211,10 @@ src/
     per_bucket_model.py   # PerBucketModel (z-score, regime-specific)
     duration_model.py     # DurationTailModel, DurationShrinkModel, DurationOverlayModel
     asymmetric_model.py   # AsymPerBucketModel
-    signal_enhanced_model.py  # SignalEnhancedTail v3 + v4 (top performers)
+    signal_enhanced_model.py  # SignalEnhancedTail v1-v6 (4 to 12 signal variants)
+    gradient_boost_model.py   # XGBoostBucketModel, XGBoostResidualModel (ML)
+    cross_validation.py   # WalkForwardCV (expanding window, temporal integrity)
+    dataset_builder.py    # Bucket-level dataset for ML training
     registry.py           # ModelRegistry + StrategyRegistry
   backtesting/
     engine.py             # BacktestEngine (cross-tier validation)
@@ -211,10 +226,14 @@ src/
   data_sources/
     polymarket/           # client.py, orders.py, auth.py
 models/
-  model_registry.json     # 14+ registered models (identity only, no metrics)
+  model_registry.json     # 26 registered models (identity only, no metrics)
+  xgb_bucket_v1/          # Trained XGBoost classifier artifact (model.pkl + feature_config.json)
+  xgb_residual_v1/        # Trained XGBoost residual artifact (model.pkl + feature_config.json)
   {model_id}/backtests/   # Per-model backtest results by tier
 strategies/
-  strategy_registry.json  # 7 strategies (model + filters + sizing -> deployment)
+  strategy_registry.json  # 16 strategies (10 paper, 6 inactive)
+scripts/
+  train_xgb_model.py     # XGBoost training + walk-forward CV + comparison
 ```
 
 ---
@@ -229,4 +248,4 @@ copied from `EsportsBetting/BettingMarkets`. No linkages -- independent copies.
 
 ---
 
-*Last updated: 2026-02-15*
+*Last updated: 2026-02-17*

@@ -752,8 +752,7 @@
         "price_dynamics"
       ],
       "hyperparameters": {
-        "signal_weight": 0.04,
-        "max_signal_boost": 0.4
+        "signal_weight": 0.04
       },
       "data_sources": [
         "xtracker",
@@ -768,6 +767,43 @@
       "status": "active",
       "created_at": "2026-02-15",
       "notes": "Gold +72.3% (42), Silver +281.7% (6), Bronze -46.9% (71). ALL +7.5% ROI, 119 bets. V5 adds 3 new signals but bronze regression is worse."
+    },
+    "signal_enhanced_tail_v6": {
+      "model_id": "signal_enhanced_tail_v6",
+      "model_name": "SignalEnhanced Tail v6 (12-Signal + Reddit)",
+      "module_path": "src.ml.signal_enhanced_model",
+      "class_name": "SignalEnhancedTailModelV6",
+      "version": "v6",
+      "description": "12-signal composite (v5 + Reddit post spike + r/elonmusk activity). Adds Reddit community signals to modulate tail boost intensity.",
+      "approach": "signal_enhanced",
+      "feature_group": "full",
+      "required_features": [
+        "financial",
+        "attention",
+        "trends",
+        "government",
+        "corporate",
+        "price_dynamics",
+        "reddit"
+      ],
+      "hyperparameters": {
+        "signal_weight": 0.035,
+        "reddit_spike_threshold": 0.20,
+        "reddit_elonmusk_high": 12.0
+      },
+      "data_sources": [
+        "xtracker",
+        "polymarket_clob",
+        "yfinance",
+        "wikipedia",
+        "gdelt",
+        "government",
+        "corporate",
+        "trends",
+        "reddit"
+      ],
+      "status": "active",
+      "created_at": "2026-02-16"
     },
     "consensus_ensemble_v1": {
       "model_id": "consensus_ensemble_v1",
@@ -798,6 +834,63 @@
       "status": "production",
       "created_at": "2026-02-15",
       "notes": "Gold +118.5% (43), Silver +161.9% (7), Bronze -3.6% (82). ALL +37.0% ROI, 132 bets, $594 P&L. NEW BEST OVERALL."
+    },
+    "xgb_bucket_v1": {
+      "model_id": "xgb_bucket_v1",
+      "model_name": "XGBoost Bucket Classifier",
+      "module_path": "src.ml.gradient_boost_model",
+      "class_name": "XGBoostBucketModel",
+      "version": "v1",
+      "description": "XGBoost binary classifier predicting P(bucket wins). First real ML model: uses all 113 event-level features + per-bucket structural features. Trained with walk-forward CV.",
+      "approach": "gradient_boosting_classification",
+      "feature_group": "full",
+      "hyperparameters": {
+        "n_estimators": 100,
+        "max_depth": 4,
+        "learning_rate": 0.05,
+        "min_child_weight": 10,
+        "subsample": 0.8,
+        "colsample_bytree": 0.7,
+        "reg_alpha": 1.0,
+        "reg_lambda": 5.0,
+        "scale_pos_weight": "auto",
+        "objective": "binary:logistic"
+      },
+      "data_sources": [
+        "xtracker", "polymarket_clob", "yfinance", "wikipedia",
+        "gdelt", "government", "corporate", "trends", "reddit"
+      ],
+      "status": "active",
+      "created_at": "2026-02-16",
+      "notes": "First ML model. Uses walk-forward CV for honest evaluation. Requires training before inference (run scripts/train_xgb_model.py)."
+    },
+    "xgb_residual_v1": {
+      "model_id": "xgb_residual_v1",
+      "model_name": "XGBoost Residual Corrector",
+      "module_path": "src.ml.gradient_boost_model",
+      "class_name": "XGBoostResidualModel",
+      "version": "v1",
+      "description": "XGBoost regressor predicting residual (actual - crowd_price) per bucket. Leverages crowd prices as strong baseline and learns correction. More conservative than raw classifier.",
+      "approach": "gradient_boosting_residual",
+      "feature_group": "full",
+      "hyperparameters": {
+        "n_estimators": 100,
+        "max_depth": 3,
+        "learning_rate": 0.03,
+        "min_child_weight": 15,
+        "subsample": 0.8,
+        "colsample_bytree": 0.7,
+        "reg_alpha": 2.0,
+        "reg_lambda": 10.0,
+        "objective": "reg:squarederror"
+      },
+      "data_sources": [
+        "xtracker", "polymarket_clob", "yfinance", "wikipedia",
+        "gdelt", "government", "corporate", "trends", "reddit"
+      ],
+      "status": "active",
+      "created_at": "2026-02-16",
+      "notes": "Residual learning over crowd prices. More conservative framing — crowd is already strong (Brier 0.81). Requires training before inference."
     }
   }
 }

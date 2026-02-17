@@ -1,6 +1,6 @@
 {
-  "version": "4.0",
-  "updated_at": "2026-02-15",
+  "version": "5.0",
+  "updated_at": "2026-02-16",
   "strategies": {
     "tail_boost_primary": {
       "strategy_id": "tail_boost_primary",
@@ -88,7 +88,7 @@
       "strategy_id": "asymmetric_selective",
       "strategy_name": "Asymmetric Selective (High ROI)",
       "model_id": "asymmetric_per_bucket_v1",
-      "status": "paper",
+      "status": "inactive",
       "description": "Highest ROI model (152.6%) but selective: only 9 bets in 38 events. Best for small bankrolls where you want max return per bet.",
       "filters": {
         "min_edge": 0.02,
@@ -129,7 +129,7 @@
       "strategy_id": "per_bucket_proven",
       "strategy_name": "Per-Bucket Proven Baseline",
       "model_id": "per_bucket_v1",
-      "status": "paper",
+      "status": "inactive",
       "description": "Original proven model with symmetric z-score momentum. Well-understood mechanics.",
       "filters": {
         "min_edge": 0.02,
@@ -436,6 +436,159 @@
       },
       "created_at": "2026-02-15",
       "notes": "Requires price_dynamics features. Uses TailBoost(0.30) + PriceDynamics(0.40) + SignalEnhanced v3(0.30)."
+    },
+    "xgb_bucket_primary": {
+      "strategy_id": "xgb_bucket_primary",
+      "strategy_name": "XGBoost Bucket Classifier",
+      "model_id": "xgb_bucket_v1",
+      "status": "inactive",
+      "description": "First ML model. XGBoost classification on bucket-level features. Requires training (scripts/train_xgb_model.py --retrain).",
+      "filters": {
+        "min_edge": 0.02,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": ["weekly", "daily", "short"],
+        "min_duration_days": 1,
+        "require_temporal_features": false
+      },
+      "sizing": {
+        "kelly_fraction": 0.25,
+        "max_bet_pct": 0.05,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "created_at": "2026-02-16",
+      "notes": "First real ML strategy. Run scripts/train_xgb_model.py --retrain before deployment."
+    },
+    "xgb_residual_primary": {
+      "strategy_id": "xgb_residual_primary",
+      "strategy_name": "XGBoost Residual Corrector",
+      "model_id": "xgb_residual_v1",
+      "status": "paper",
+      "description": "Residual correction over crowd prices. More conservative framing. Requires training.",
+      "filters": {
+        "min_edge": 0.02,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": ["weekly", "daily", "short"],
+        "min_duration_days": 1,
+        "require_temporal_features": false
+      },
+      "sizing": {
+        "kelly_fraction": 0.25,
+        "max_bet_pct": 0.05,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "created_at": "2026-02-16",
+      "notes": "Residual learning: predicts correction to crowd prices. Run scripts/train_xgb_model.py --retrain --framing residual before deployment."
+    },
+    "signal_enhanced_v5_volume": {
+      "strategy_id": "signal_enhanced_v5_volume",
+      "strategy_name": "Signal-Enhanced V5 Volume (10-Signal)",
+      "model_id": "signal_enhanced_tail_v5",
+      "status": "paper",
+      "description": "V5 model with 10 signals (v4 + govt calendar, corporate events, price momentum). Gold +72.3%, Silver +281.7%, Bronze -46.9%. ALL +7.5% ROI, 119 bets.",
+      "filters": {
+        "min_edge": 0.02,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": ["weekly", "daily", "short"],
+        "min_duration_days": 1,
+        "require_temporal_features": false
+      },
+      "sizing": {
+        "kelly_fraction": 0.25,
+        "max_bet_pct": 0.05,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "all",
+        "n_events": 159,
+        "n_bets": 119,
+        "roi_pct": 7.5,
+        "total_pnl": 103.0
+      },
+      "created_at": "2026-02-16",
+      "notes": "10-signal composite. Weaker bronze performance (-46.9%) but strong gold/silver. Paper trade to validate live."
+    },
+    "signal_enhanced_v6_reddit": {
+      "strategy_id": "signal_enhanced_v6_reddit",
+      "strategy_name": "Signal-Enhanced V6 (12-Signal + Reddit)",
+      "model_id": "signal_enhanced_tail_v6",
+      "status": "inactive",
+      "description": "V6 model with 12 signals (v5 + Reddit post spike + r/elonmusk activity). Newest signal model — no backtest yet, paper trade for live validation.",
+      "filters": {
+        "min_edge": 0.02,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": ["weekly", "daily", "short"],
+        "min_duration_days": 1,
+        "require_temporal_features": false
+      },
+      "sizing": {
+        "kelly_fraction": 0.25,
+        "max_bet_pct": 0.03,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "created_at": "2026-02-16",
+      "notes": "Newest model, no backtest history. Reduced max_bet_pct (3%) for conservative sizing during validation."
+    },
+    "cross_market_arb_gold": {
+      "strategy_id": "cross_market_arb_gold",
+      "strategy_name": "Cross-Market Arb (Gold-Tier Focus)",
+      "model_id": "cross_market_arb_v1",
+      "status": "inactive",
+      "description": "Cross-market consistency arb: daily vs weekly divergence. Strong on gold (+55.4%) and silver (+384.4%), fails on bronze (-60%). Restricted to recent-period markets where cross-market data exists.",
+      "filters": {
+        "min_edge": 0.03,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": ["daily", "short"],
+        "min_duration_days": 1,
+        "require_temporal_features": false
+      },
+      "sizing": {
+        "kelly_fraction": 0.20,
+        "max_bet_pct": 0.04,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "gold",
+        "n_events": 38,
+        "n_bets": 32,
+        "roi_pct": 55.4
+      },
+      "created_at": "2026-02-16",
+      "notes": "Restricted to daily/short markets where cross-market divergence signal is strongest. Higher min_edge (3%) and lower sizing to manage bronze-tier risk."
     }
   }
 }

@@ -38,10 +38,11 @@ from src.backtesting.engine import BacktestEngine
 from src.ml.baseline_model import NaiveBucketModel, CrowdModel
 from src.ml.advanced_models import RegimeAwareModel, MarketAdjustedModel, EnsembleModel
 from src.ml.per_bucket_model import PerBucketModel
-from src.ml.signal_enhanced_model import SignalEnhancedTailModel, SignalEnhancedTailModelV4, SignalEnhancedTailModelV5
+from src.ml.signal_enhanced_model import SignalEnhancedTailModel, SignalEnhancedTailModelV4, SignalEnhancedTailModelV5, SignalEnhancedTailModelV6
 from src.ml.price_dynamics_model import PriceDynamicsModel
 from src.ml.cross_market_model import CrossMarketArbModel
 from src.ml.consensus_model import ConsensusEnsembleModel
+from src.ml.gradient_boost_model import XGBoostBucketModel, XGBoostResidualModel
 from src.ml.registry import ModelRegistry, StrategyRegistry
 
 # ---------------------------------------------------------------------------
@@ -65,9 +66,12 @@ MODEL_MAP = {
     "signal_enhanced": SignalEnhancedTailModel,
     "signal_enhanced_v4": SignalEnhancedTailModelV4,
     "signal_enhanced_v5": SignalEnhancedTailModelV5,
+    "signal_enhanced_v6": SignalEnhancedTailModelV6,
     "price_dynamics": PriceDynamicsModel,
     "cross_market_arb": CrossMarketArbModel,
     "consensus_ensemble": ConsensusEnsembleModel,
+    "xgb_bucket": XGBoostBucketModel,
+    "xgb_residual": XGBoostResidualModel,
 }
 
 # Maps model_id from registry to MODEL_MAP key for instantiation
@@ -83,9 +87,12 @@ MODEL_ID_TO_KEY = {
     "signal_enhanced_tail_v3": "signal_enhanced",
     "signal_enhanced_tail_v4": "signal_enhanced_v4",
     "signal_enhanced_tail_v5": "signal_enhanced_v5",
+    "signal_enhanced_tail_v6": "signal_enhanced_v6",
     "price_dynamics_v1": "price_dynamics",
     "cross_market_arb_v1": "cross_market_arb",
     "consensus_ensemble_v1": "consensus_ensemble",
+    "xgb_bucket_v1": "xgb_bucket",
+    "xgb_residual_v1": "xgb_residual",
 }
 
 
@@ -204,6 +211,17 @@ def main():
         action="store_true",
         help="Skip logging results to model registry",
     )
+    parser.add_argument(
+        "--cv",
+        action="store_true",
+        help="Run walk-forward cross-validation instead of single pass",
+    )
+    parser.add_argument(
+        "--cv-folds",
+        type=int,
+        default=5,
+        help="Number of CV folds (default: 5)",
+    )
     args = parser.parse_args()
 
     # Load index
@@ -296,6 +314,32 @@ def main():
 
     if not events:
         print("No events match the filter criteria.")
+        return
+
+    # Walk-forward CV mode
+    if args.cv:
+        from src.ml.cross_validation import WalkForwardCV
+
+        cv = WalkForwardCV(min_train_events=20, n_folds=args.cv_folds)
+
+        # For ML models that need training, pass train_events
+        is_ml_model = args.model in ("xgb_bucket", "xgb_residual")
+
+        def model_factory(train_events=None):
+            if strategy_id is not None:
+                mr = ModelRegistry()
+                try:
+                    m = mr.instantiate_model(strategy_def["model_id"])
+                except (ValueError, KeyError):
+                    m = load_model_from_id(strategy_def["model_id"])
+            else:
+                m = load_model(args.model)
+            if is_ml_model and train_events is not None:
+                m.fit(train_events)
+            return m
+
+        cv_result = cv.evaluate(model_factory, events, engine_config)
+        cv.print_cv_report(cv_result, model.name)
         return
 
     # Run backtest

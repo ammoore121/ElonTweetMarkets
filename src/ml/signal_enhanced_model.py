@@ -416,3 +416,100 @@ class SignalEnhancedTailModelV5(SignalEnhancedTailModelV4):
             "price_momentum_threshold": self.PRICE_MOMENTUM_THRESHOLD,
         })
         return params
+
+
+class SignalEnhancedTailModelV6(SignalEnhancedTailModelV5):
+    """V6: 12-signal composite adding Reddit activity signals.
+
+    Extends V5's 10-signal approach with 2 Reddit community signals.
+    Uses lower per-signal weight (0.035 vs 0.04) since there are now 12
+    signals instead of 10.
+
+    Signal composite (12 signals, 0-1 each):
+        1-10. All signals from V5 (Tesla vol, DOGE, Wiki, TSLA drawdown,
+              VIX, Google Trends, Crypto F&G, govt, corporate, price momentum)
+        11. Reddit post spike (NEW) -- reddit_post_delta > 0.20 (20% above 7d avg)
+        12. Reddit r/elonmusk activity (NEW) -- reddit_elonmusk_posts_7d > threshold
+    """
+
+    # Adjusted for 12 signals
+    SIGNAL_WEIGHT = 0.035
+    MAX_SIGNAL_BOOST = 0.42  # 12 signals * 0.035
+
+    # Reddit signal thresholds
+    REDDIT_SPIKE_THRESHOLD = 0.20    # 20% above 7d average
+    REDDIT_ELONMUSK_HIGH = 12.0      # Posts/day in r/elonmusk (above typical ~8-10)
+
+    def __init__(
+        self,
+        name: str = "signal_enhanced_tail",
+        version: str = "v6",
+        base_tail_boost: float = None,
+        tail_threshold_sd: float = None,
+        signal_weight: float = None,
+        short_shrink: float = None,
+        vix_high_threshold: float = None,
+        gt_spike_threshold: float = None,
+        crypto_fg_extreme_low: float = None,
+        crypto_fg_extreme_high: float = None,
+        price_momentum_threshold: float = None,
+        reddit_spike_threshold: float = None,
+        reddit_elonmusk_high: float = None,
+    ):
+        super().__init__(
+            name=name,
+            version=version,
+            base_tail_boost=base_tail_boost,
+            tail_threshold_sd=tail_threshold_sd,
+            signal_weight=signal_weight,
+            short_shrink=short_shrink,
+            vix_high_threshold=vix_high_threshold,
+            gt_spike_threshold=gt_spike_threshold,
+            crypto_fg_extreme_low=crypto_fg_extreme_low,
+            crypto_fg_extreme_high=crypto_fg_extreme_high,
+            price_momentum_threshold=price_momentum_threshold,
+        )
+        if reddit_spike_threshold is not None:
+            self.REDDIT_SPIKE_THRESHOLD = reddit_spike_threshold
+        if reddit_elonmusk_high is not None:
+            self.REDDIT_ELONMUSK_HIGH = reddit_elonmusk_high
+
+    def _compute_signal_score(self, features: dict) -> float:
+        """Compute 12-signal composite score.
+
+        Returns a value in [0, 12] where each signal contributes 0-1.
+        """
+        # Start with the 10 existing signals from parent (V5)
+        score = super()._compute_signal_score(features)
+
+        reddit = features.get("reddit", {})
+
+        # Signal 11: Reddit post spike (3d vs 7d delta)
+        reddit_delta = reddit.get("reddit_post_delta")
+        if reddit_delta is not None and reddit_delta > self.REDDIT_SPIKE_THRESHOLD:
+            # Proportional: threshold → 0, 2x threshold → 1
+            score += min(1.0, reddit_delta / (self.REDDIT_SPIKE_THRESHOLD * 2))
+
+        # Signal 12: High r/elonmusk activity (absolute level)
+        elonmusk_posts = reddit.get("reddit_elonmusk_posts_7d")
+        if elonmusk_posts is not None and elonmusk_posts > self.REDDIT_ELONMUSK_HIGH:
+            # Proportional: threshold → 0, 2x threshold → 1
+            score += min(1.0, (elonmusk_posts - self.REDDIT_ELONMUSK_HIGH) / self.REDDIT_ELONMUSK_HIGH)
+
+        return score
+
+    def get_config(self) -> dict:
+        config = super().get_config()
+        config.update({
+            "reddit_spike_threshold": self.REDDIT_SPIKE_THRESHOLD,
+            "reddit_elonmusk_high": self.REDDIT_ELONMUSK_HIGH,
+        })
+        return config
+
+    def get_hyperparameters(self) -> dict:
+        params = super().get_hyperparameters()
+        params.update({
+            "reddit_spike_threshold": self.REDDIT_SPIKE_THRESHOLD,
+            "reddit_elonmusk_high": self.REDDIT_ELONMUSK_HIGH,
+        })
+        return params

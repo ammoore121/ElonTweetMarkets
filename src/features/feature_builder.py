@@ -42,6 +42,7 @@ from src.features.extractors import (
     compute_financial_features,
     compute_attention_features,
     compute_trends_features,
+    compute_reddit_features,
 )
 
 
@@ -74,6 +75,7 @@ GOVT_EVENTS_PATH = PROJECT_DIR / "data" / "sources" / "government" / "events.par
 CORPORATE_EVENTS_PATH = (
     PROJECT_DIR / "data" / "sources" / "calendar" / "corporate_events.parquet"
 )
+REDDIT_PATH = PROJECT_DIR / "data" / "sources" / "reddit" / "daily_activity.parquet"
 
 # GDELT entity keys (filename stems)
 GDELT_ENTITIES = ["elon_musk", "tesla", "spacex", "neuralink"]
@@ -167,11 +169,19 @@ TRENDS_FEATURES = [
     "gt_total_7d", "gt_concentration",
 ]
 
+REDDIT_FEATURES = [
+    "reddit_total_posts_7d", "reddit_total_comments_7d",
+    "reddit_post_delta", "reddit_elonmusk_posts_7d",
+    "reddit_teslamotors_posts_7d", "reddit_attention_concentration",
+    "reddit_top_score_7d",
+]
+
 ALL_FEATURES = (
     TEMPORAL_FEATURES + MEDIA_FEATURES + CALENDAR_FEATURES
     + GOVERNMENT_FEATURES + CORPORATE_FEATURES
     + MARKET_FEATURES + CROSS_FEATURES
     + FINANCIAL_FEATURES + ATTENTION_FEATURES + TRENDS_FEATURES
+    + REDDIT_FEATURES
 )
 
 
@@ -189,7 +199,7 @@ FEATURE_GROUPS: Dict[str, Dict[str, Any]] = {
     },
     "full": {
         "features": ALL_FEATURES,
-        "categories": {"temporal", "media", "calendar", "government", "corporate", "market", "cross", "financial", "attention", "trends"},
+        "categories": {"temporal", "media", "calendar", "government", "corporate", "market", "cross", "financial", "attention", "trends", "reddit"},
         "description": "All available features across all categories",
     },
     "market_adjusted": {
@@ -229,8 +239,11 @@ FEATURE_GROUPS: Dict[str, Dict[str, Any]] = {
             "govt_event_flag_7d", "govt_exec_order_flag_7d",
             # Corporate
             "corporate_event_flag_7d", "tesla_earnings_flag_14d",
+            # Reddit
+            "reddit_total_posts_7d", "reddit_post_delta",
+            "reddit_elonmusk_posts_7d",
         ],
-        "categories": {"temporal", "media", "calendar", "government", "corporate", "market", "cross", "financial", "attention", "trends"},
+        "categories": {"temporal", "media", "calendar", "government", "corporate", "market", "cross", "financial", "attention", "trends", "reddit"},
         "description": "Features for market-adjusted predictions",
     },
     "temporal_only": {
@@ -421,6 +434,13 @@ def _load_corporate_events() -> pd.DataFrame:
     return df
 
 
+def _load_reddit_data() -> pd.DataFrame:
+    """Load Reddit daily activity data from parquet."""
+    if not REDDIT_PATH.exists():
+        return pd.DataFrame()
+    return pd.read_parquet(REDDIT_PATH)
+
+
 def _load_catalog() -> pd.DataFrame:
     """Load market_catalog.parquet."""
     if not CATALOG_PATH.exists():
@@ -495,6 +515,7 @@ class TweetFeatureBuilder:
         self._crypto_fg_data: Optional[pd.DataFrame] = None
         self._govt_events: Optional[pd.DataFrame] = None
         self._corporate_events: Optional[pd.DataFrame] = None
+        self._reddit_data: Optional[pd.DataFrame] = None
 
     # ------------------------------------------------------------------
     # Lazy data source accessors
@@ -576,6 +597,12 @@ class TweetFeatureBuilder:
         if self._corporate_events is None:
             self._corporate_events = _load_corporate_events()
         return self._corporate_events
+
+    @property
+    def reddit_data(self) -> pd.DataFrame:
+        if self._reddit_data is None:
+            self._reddit_data = _load_reddit_data()
+        return self._reddit_data
 
     # ------------------------------------------------------------------
     # Category need checks
@@ -716,6 +743,15 @@ class TweetFeatureBuilder:
         else:
             trends = {}
         result["trends"] = trends
+
+        # --- 9. Reddit features ---
+        if self._needs("reddit"):
+            reddit = compute_reddit_features(
+                self.reddit_data, start_date
+            )
+        else:
+            reddit = {}
+        result["reddit"] = reddit
 
         return result
 

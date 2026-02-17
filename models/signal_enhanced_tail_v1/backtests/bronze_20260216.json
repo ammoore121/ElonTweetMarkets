@@ -1,0 +1,18 @@
+{
+  "model_id": "signal_enhanced_tail_v1",
+  "tier": "bronze",
+  "run_date": "20260216",
+  "config": "model=signal_enhanced, bankroll=$1,000, kelly=0.25, min_edge=2%, entry=T-24h",
+  "metrics": {
+    "brier_score": 0.523845,
+    "log_loss": 1.093162,
+    "accuracy": "67/112",
+    "roi_pct": -54.46,
+    "n_events": 112,
+    "n_bets": 68,
+    "total_pnl": -431.12,
+    "total_wagered": 791.69
+  },
+  "notes": "Auto-logged from run_backtest.py",
+  "logged_at": "2026-02-16T17:06:11.205964+00:00"
+}

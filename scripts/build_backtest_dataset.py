@@ -282,6 +282,7 @@ def build_backtest(tier_filter=None, slug_filter=None):
         "with_financial": 0,
         "with_attention": 0,
         "with_trends": 0,
+        "with_reddit": 0,
     }
 
     for _, event_row in tqdm(events.iterrows(), total=len(events),
@@ -332,6 +333,7 @@ def build_backtest(tier_filter=None, slug_filter=None):
         financial = all_features.get("financial", {})
         attention = all_features.get("attention", {})
         trends = all_features.get("trends", {})
+        reddit = all_features.get("reddit", {})
 
         stats["total"] += 1
         if n_price_rows > 0:
@@ -352,6 +354,8 @@ def build_backtest(tier_filter=None, slug_filter=None):
             stats["with_attention"] += 1
         if any(v is not None for v in trends.values()):
             stats["with_trends"] += 1
+        if any(v is not None for v in reddit.values()):
+            stats["with_reddit"] += 1
 
         # --- Index entry ---
         index_entries.append({
@@ -403,6 +407,7 @@ def build_backtest(tier_filter=None, slug_filter=None):
             "with_financial_features": stats["with_financial"],
             "with_attention_features": stats["with_attention"],
             "with_trends_features": stats["with_trends"],
+            "with_reddit_features": stats["with_reddit"],
         },
         "events": index_entries,
     }
@@ -427,6 +432,7 @@ def build_backtest(tier_filter=None, slug_filter=None):
     print("  With financial features: {}".format(stats["with_financial"]))
     print("  With attention features: {}".format(stats["with_attention"]))
     print("  With trends features:    {}".format(stats["with_trends"]))
+    print("  With reddit features:    {}".format(stats["with_reddit"]))
     print("")
     print("  Output directory:        {}".format(BACKTEST_DIR))
     print("  Index file:              {}".format(INDEX_PATH))

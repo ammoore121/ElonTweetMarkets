@@ -11,10 +11,9 @@
   - 48 tracking periods with cumulative counts
   - Note: 30/103 records show count=0 (noon-to-noon boundary artifact, not real zeros)
 
-- [ ] **Task 2: Download Kaggle tweet dataset** ⛔ BLOCKED
-  - Needs manual Kaggle API key at `~/.kaggle/kaggle.json`
-  - NOT blocking backtest (XTracker + market resolution data sufficient for MVP)
-  - Script ready: `scripts/fetch_tweet_history.py`
+- [x] **Task 2: Download Kaggle tweet dataset** ✅ (Completed in Task 15)
+  - 3 CSVs merged → `data/processed/daily_counts.json` (3053 days, 2010-2026)
+  - Gap: 2025-04-13 to 2025-10-30 (~200 days, Kaggle ends before XTracker starts)
 
 - [x] **Task 3: Fetch Polymarket Elon tweet markets**
   - `tweet_events_comprehensive.json` (10.8MB, 125 events) - PRIMARY source
@@ -250,6 +249,8 @@ Pipeline is "working" when:
 | 2026-02-15 | Phase 9: Signal-enhanced models. 3 new data sources (Tesla/TSLA, Crypto DOGE+BTC, Wikipedia pageviews) integrated. 72 features across 7 categories. SignalEnhancedTail v3 new best model (+$395 P&L across all tiers). 2 new strategies registered. |
 | 2026-02-15 | Phase 10 planned: 3 new approaches (intra-market arb, price dynamics, cross-market consistency), 6 new data sources, 20+ new features. Goal: high volume + positive expectancy. |
 | 2026-02-15 | **Phase 10 complete**: 3 approaches validated (1 FAIL, 2 PASS). 5 new data fetchers built. ~98 features across 10 categories. 4 new models: PriceDynamics (+33.1% ROI), CrossMarketArb (+55.4% gold), SignalEnhanced v5 (+7.5%), **ConsensusEnsemble (+37.0% ROI, $594 P&L, 132 bets = NEW BEST)**. Registry: 23 models, 11 strategies. |
+| 2026-02-16 | **Phase 11 complete**: Real ML via XGBoost. Walk-forward CV infra, bucket-level dataset builder, 2 framings (classification + residual). **XGBoostResidualModel: +28.4% ROI on walk-forward CV (161 bets, $826 P&L)**. Top features: crowd_price (12.2%), heuristic_prob (6.3%), elon_musk_vol_3d (3.4%). Registry: 26 models, 16 strategies. |
+| 2026-02-17 | Activated 10 paper strategies for live pipeline (deactivated 5 negative-ROI strategies). Pipeline run: 17/17 steps OK, 50 signals, 3 new paper bets. Cumulative paper P&L: +$191.63 (+68.5% ROI on 26 bets). |
 
 ---
 
@@ -377,3 +378,88 @@ Pipeline is "working" when:
 - [x] SignalEnhanced v5: 10 signals (v4 + govt, corporate, momentum) — +7.5% ROI, 119 bets
 - [x] Cross-tier backtested all 4 new models
 - [x] Registered: 23 models (v5.0), 11 strategies (v4.0)
+
+---
+
+### Phase 11: Real ML Models (XGBoost Bucket-Level) ✅
+
+- [x] **Task 27: Walk-forward cross-validation infrastructure**
+  - Module: `src/ml/cross_validation.py` (WalkForwardCV class)
+  - Expanding-window folds, temporal integrity (never trains on future events)
+  - Min 20 training events per fold, configurable n_folds
+  - Integrated into `run_backtest.py` via `--cv` and `--cv-folds` flags
+
+- [x] **Task 28: Bucket-level dataset builder**
+  - Module: `src/ml/dataset_builder.py`
+  - Converts 159 events → ~2,725 (event, bucket) training rows
+  - 125 features: 113 event-level (flattened from TweetFeatureBuilder) + 12 per-bucket structural
+  - Per-bucket features: position_normalized, midpoint, width, crowd_price, is_tail, distance_from_ev, heuristic_prob, heuristic_edge
+  - Handles open-ended buckets, object→numeric coercion, null handling
+
+- [x] **Task 29: XGBoost models (two framings)**
+  - Module: `src/ml/gradient_boost_model.py`
+  - **Framing A (XGBoostBucketModel)**: Raw P(bucket wins) classification. -20.4% ROI on CV — overfits.
+  - **Framing B (XGBoostResidualModel)**: Predicts residual = actual - crowd_price. **+28.4% ROI on walk-forward CV, 161 bets, $826 P&L. Beats all heuristics.**
+  - Aggressive regularization: max_depth=3-4, reg_lambda=5-10, min_child_weight=10-15
+  - Both save/load via joblib. Plugs into BacktestEngine with zero changes.
+
+- [x] **Task 30: Training script + comparison**
+  - Script: `scripts/train_xgb_model.py`
+  - Walk-forward CV with per-fold metrics
+  - `--compare` flag runs heuristic baselines for head-to-head comparison
+  - `--retrain` retrains on all data for production deployment
+  - Feature importance analysis, calibration analysis
+
+- [x] **Task 31: Integration & registration**
+  - XGBoost models added to `MODEL_MAP` in run_backtest.py
+  - 2 models registered in model_registry.json (26 models total)
+  - 2 strategies registered in strategy_registry.json (16 strategies total, 10 paper, 6 inactive)
+  - `--cv` flag added to run_backtest.py for walk-forward CV mode
+
+**Walk-Forward CV Results (5 folds, 139 test events, 2% min_edge):**
+
+| Model | Bets | P&L | ROI | Brier |
+|-------|------|-----|-----|-------|
+| **XGBoost Residual** | 161 | **+$826** | **+28.4%** | 0.5965 |
+| ConsensusEnsemble | 159 | +$377 | +21.7% | 0.5945 |
+| SignalEnhanced v3 | 105 | +$22 | +1.9% | 0.6031 |
+| XGBoost Bucket | 267 | -$639 | -20.4% | 0.6360 |
+| TailBoost | 67 | -$233 | -36.1% | 0.5971 |
+
+**Key findings:**
+- Residual framing >> raw classification. Crowd is strong baseline; learning corrections is easier.
+- Top features: crowd_price (12.2%), heuristic_prob (6.3%), elon_musk_vol_3d (3.4%), heuristic_edge (3.1%)
+- XGBoost Bucket model is well-calibrated (predicted P(win) matches actual win rates) but bets too aggressively
+- XGBoost Residual uses all 113 features — first model to actually leverage the full feature set
+
+---
+
+### Phase 12: Strategy Bands & New Institutional Data Sources
+
+- [ ] **Task 32: Build strategy bands (confidence-based sizing)**
+  - Design and implement a multi-tier betting strategy that varies position size based on model agreement / confidence level
+  - "Bands": e.g., Band 1 (high confidence, 3+ models agree, full Kelly), Band 2 (moderate, 2 models, half Kelly), Band 3 (low, 1 model, quarter Kelly)
+  - Compare different band definitions (by model count, edge magnitude, signal overlap) on walk-forward CV
+  - Integration with existing strategy registry — add band-based strategies
+  - Should work with both heuristic and ML models
+  - Goal: maximize Sharpe ratio / risk-adjusted returns, not just raw ROI
+
+- [ ] **Task 33: Fetch SEC 13F institutional holdings data (TSLA)**
+  - Build fetcher: `scripts/fetch_13f_holdings.py`
+  - Source: SEC EDGAR API (free, no auth) — 13F-HR filings for TSLA
+  - Extract: top 50 institutional holders, quarterly position changes (bought/sold/new/exited)
+  - Compute features: net_institutional_flow, pct_held_by_institutions, top10_net_change, n_new_positions, n_exited_positions
+  - Output: `data/sources/sec/tsla_13f_holdings.parquet`
+  - Integrate into feature_builder.py as "institutional" category
+  - Key signal: large institutional sells may correlate with Elon sentiment / tweet activity
+  - Note: 13F filings are quarterly (~45 day lag), so features will be point-in-time from last filing date
+
+- [ ] **Task 34: Fetch TSLA insider transactions**
+  - Build fetcher: `scripts/fetch_insider_transactions.py`
+  - Source: SEC EDGAR XBRL API (Form 4 filings) or yfinance insider data
+  - Extract: Elon Musk + other TSLA officers/directors transactions (buys, sells, option exercises)
+  - Compute features: insider_net_shares_30d, insider_sell_count_30d, elon_sold_flag_30d, insider_buy_sell_ratio
+  - Output: `data/sources/sec/tsla_insider_transactions.parquet`
+  - Integrate into feature_builder.py as "insider" or "institutional" category
+  - Key signal: Elon selling TSLA shares often correlates with high tweet activity (managing narrative)
+  - Note: Form 4 filings typically within 2 business days of transaction — much more timely than 13F

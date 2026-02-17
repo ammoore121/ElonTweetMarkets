@@ -15,6 +15,7 @@ Categories:
     corporate  - Corporate events (earnings, launches, filings)
     market     - Crowd-derived signals from Polymarket prices
     cross      - Interaction features combining multiple raw signals
+    reddit     - Reddit post/comment activity across Elon-related subreddits
 
 Ported from scripts/build_backtest_dataset.py (22 existing factors)
 plus 14 new factors defined in src/features/factor_registry.py.
@@ -866,6 +867,96 @@ def compute_market_features(
         label = row["bucket_label"]
         positions[label] = round(idx / max(n_total - 1, 1), 4)
     features["bucket_position_normalized"] = positions
+
+    return features
+
+
+# ---------------------------------------------------------------------------
+# REDDIT ACTIVITY FEATURES (7 new)
+# ---------------------------------------------------------------------------
+def compute_reddit_features(
+    reddit_data: "pd.DataFrame",
+    event_start_date: str,
+) -> dict:
+    """Compute Reddit activity features using only data BEFORE event_start_date.
+
+    Reddit (7 factors):
+        reddit_total_posts_7d      - Total posts across all subreddits (trailing 7d)
+        reddit_total_comments_7d   - Total comments across all subreddits (trailing 7d)
+        reddit_post_delta          - (3d avg - 7d avg) / 7d avg post count
+        reddit_elonmusk_posts_7d   - Posts in r/elonmusk (trailing 7d avg)
+        reddit_teslamotors_posts_7d - Posts in r/teslamotors (trailing 7d avg)
+        reddit_attention_concentration - HHI of post volume across subreddits
+        reddit_top_score_7d        - Avg top_post_score across subreddits (trailing 7d)
+    """
+    features = {
+        "reddit_total_posts_7d": None,
+        "reddit_total_comments_7d": None,
+        "reddit_post_delta": None,
+        "reddit_elonmusk_posts_7d": None,
+        "reddit_teslamotors_posts_7d": None,
+        "reddit_attention_concentration": None,
+        "reddit_top_score_7d": None,
+    }
+
+    if not event_start_date or reddit_data is None or reddit_data.empty:
+        return features
+
+    # Filter to data before event start
+    prior = reddit_data[reddit_data["date"] < event_start_date].copy()
+    if prior.empty:
+        return features
+
+    # 7-day trailing window
+    dates_7 = _trailing_dates(event_start_date, 7)
+    dates_3 = _trailing_dates(event_start_date, 3)
+
+    window_7d = prior[prior["date"].isin(dates_7)]
+    window_3d = prior[prior["date"].isin(dates_3)]
+
+    if window_7d.empty:
+        return features
+
+    # Aggregate across all subreddits per day, then average
+    daily_7d = window_7d.groupby("date").agg(
+        posts=("post_count", "sum"),
+        comments=("comment_count", "sum"),
+        top_score=("top_post_score", "max"),
+    )
+
+    avg_posts_7d = daily_7d["posts"].mean()
+    avg_comments_7d = daily_7d["comments"].mean()
+    avg_top_score_7d = daily_7d["top_score"].mean()
+
+    features["reddit_total_posts_7d"] = round(float(avg_posts_7d), 2)
+    features["reddit_total_comments_7d"] = round(float(avg_comments_7d), 2)
+    features["reddit_top_score_7d"] = round(float(avg_top_score_7d), 2)
+
+    # Post delta (spike indicator): 3d vs 7d
+    if not window_3d.empty:
+        daily_3d = window_3d.groupby("date")["post_count"].sum()
+        avg_posts_3d = daily_3d.mean()
+        if avg_posts_7d > 0:
+            features["reddit_post_delta"] = round(
+                float((avg_posts_3d - avg_posts_7d) / avg_posts_7d), 4
+            )
+
+    # Per-subreddit 7d averages
+    sub_avgs = window_7d.groupby("subreddit")["post_count"].mean()
+
+    elonmusk_avg = sub_avgs.get("elonmusk")
+    if elonmusk_avg is not None:
+        features["reddit_elonmusk_posts_7d"] = round(float(elonmusk_avg), 2)
+
+    teslamotors_avg = sub_avgs.get("teslamotors")
+    if teslamotors_avg is not None:
+        features["reddit_teslamotors_posts_7d"] = round(float(teslamotors_avg), 2)
+
+    # Attention concentration (HHI across subreddits)
+    total_sub_posts = float(sub_avgs.sum())
+    if total_sub_posts > 0:
+        hhi = sum((float(v) / total_sub_posts) ** 2 for v in sub_avgs.values)
+        features["reddit_attention_concentration"] = round(hhi, 4)
 
     return features
 

@@ -1,0 +1,369 @@
+"""Generate consensus band signals from inter-strategy agreement.
+
+Reads recent signals from the paper trading tracker, groups them by
+(event, best_bucket) to detect inter-strategy agreement, and creates
+new consensus "band signals" with confidence-scaled Kelly sizing.
+
+Band levels:
+  - Band 1 (high):   4+ strategies agree -> 0.30 Kelly, max_bet_pct 0.06
+  - Band 2 (medium): 2-3 strategies agree -> quarter-Kelly (0.25), max_bet_pct 0.05
+  - Band 3 (low):    1 strategy only -> skip (base strategies already handle it)
+
+Sizing rationale (from consensus sizing analysis, 2026-02-17):
+  Band 1 consensus edges (5.24%) are nearly identical to base edges (5.21%),
+  so 0.50 Kelly was oversized by ~2x. Reduced to 0.30 Kelly (modest premium
+  for strategy coordination signal, not a full doubling).
+
+Usage:
+    python scripts/generate_band_signals.py
+    python scripts/generate_band_signals.py --dry-run
+    python scripts/generate_band_signals.py --lookback-hours 24
+"""
+
+import argparse
+import json
+import logging
+import sys
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_DIR))
+
+from src.paper_trading.schemas import Signal
+from src.paper_trading.tracker import PerformanceTracker
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+CONFIG_PATH = PROJECT_DIR / "config" / "pipeline.json"
+
+# Band configuration
+BAND_CONFIG = {
+    1: {
+        "min_strategies": 4,
+        "kelly_fraction": 0.30,
+        "max_bet_pct": 0.06,
+        "strategy_id": "band_1",
+    },
+    2: {
+        "min_strategies": 2,
+        "kelly_fraction": 0.25,
+        "max_bet_pct": 0.05,
+        "strategy_id": "band_2",
+    },
+}
+
+MODEL_ID = "strategy_bands_v1"
+
+
+def load_config() -> dict:
+    """Load pipeline config."""
+    if CONFIG_PATH.exists():
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {"auto_bet": {"enabled": False, "mode": "paper"}}
+
+
+def compute_kelly_wager(
+    edge: float,
+    market_price: float,
+    kelly_fraction: float,
+    max_bet_pct: float,
+    bankroll: float = 1000.0,
+    min_bet: float = 5.0,
+) -> tuple:
+    """Compute Kelly-criterion wager for band signals.
+
+    Returns (wager, raw_kelly_fraction).
+    """
+    if market_price <= 0 or market_price >= 1 or edge <= 0:
+        return 0.0, 0.0
+
+    kelly_f = edge / (1.0 - market_price)
+    wager = bankroll * kelly_f * kelly_fraction
+    wager = max(min_bet, wager)
+    wager = min(bankroll * max_bet_pct, wager)
+
+    return wager, kelly_f
+
+
+def determine_band_level(n_strategies: int) -> int:
+    """Determine band level from strategy agreement count.
+
+    Returns band level (1, 2) or 0 if below threshold.
+    """
+    if n_strategies >= BAND_CONFIG[1]["min_strategies"]:
+        return 1
+    elif n_strategies >= BAND_CONFIG[2]["min_strategies"]:
+        return 2
+    return 0
+
+
+def average_distributions(signals: list) -> dict:
+    """Compute the mean predicted probability distribution across signals.
+
+    Each signal contributes its full predicted_probs dict. The result
+    is the element-wise mean, normalized to sum to 1.0.
+    """
+    if not signals:
+        return {}
+
+    bucket_sums = defaultdict(float)
+    n = len(signals)
+
+    for sig in signals:
+        for label, prob in sig.predicted_probs.items():
+            bucket_sums[label] += prob
+
+    averaged = {label: total / n for label, total in bucket_sums.items()}
+
+    # Normalize to sum to 1.0
+    total_mass = sum(averaged.values())
+    if total_mass > 0:
+        averaged = {label: p / total_mass for label, p in averaged.items()}
+
+    return averaged
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Generate consensus band signals from strategy agreement"
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Generate band signals but skip betslip creation",
+    )
+    parser.add_argument(
+        "--lookback-hours",
+        type=int,
+        default=12,
+        help="How far back to look for base signals (default: 12)",
+    )
+    args = parser.parse_args()
+
+    config = load_config()
+    auto_bet = config.get("auto_bet", {})
+    auto_bet_enabled = auto_bet.get("enabled", False) and not args.dry_run
+    bankroll = auto_bet.get("bankroll", 1000.0)
+    min_bet = auto_bet.get("min_bet", 5.0)
+
+    # Initialize tracker
+    tracker = PerformanceTracker(
+        odds_dir=str(PROJECT_DIR / "data" / "odds"),
+        signals_dir=str(PROJECT_DIR / "data" / "signals"),
+    )
+
+    # Read recent actionable signals (meets_criteria=True, within lookback window)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=args.lookback_hours)
+    recent_signals = tracker.get_signals(meets_criteria=True, start_date=cutoff)
+
+    # Exclude any signals already generated by this band model to avoid self-reference
+    base_signals = [s for s in recent_signals if s.model_id != MODEL_ID]
+
+    logger.info(
+        "Found %d actionable base signals in last %d hours",
+        len(base_signals),
+        args.lookback_hours,
+    )
+
+    if not base_signals:
+        logger.info("No base signals found. Nothing to do.")
+        print()
+        print("=" * 55)
+        print("  BAND SIGNAL SUMMARY")
+        print("=" * 55)
+        print("  Base signals found:     {:>4d}".format(0))
+        print("  Band 1 signals:         {:>4d}".format(0))
+        print("  Band 2 signals:         {:>4d}".format(0))
+        print("  Betslips placed:        {:>4d}".format(0))
+        print("=" * 55)
+        return
+
+    # Group signals by (odds_id, best_bucket)
+    # odds_id ties the signal to a specific event snapshot, so signals sharing
+    # the same odds_id are for the same event at the same point in time.
+    groups = defaultdict(list)
+    for sig in base_signals:
+        key = (sig.odds_id, sig.best_bucket)
+        groups[key].append(sig)
+
+    logger.info(
+        "Grouped into %d (event+bucket) combinations", len(groups)
+    )
+
+    # Process each group
+    band_1_count = 0
+    band_2_count = 0
+    betslips_placed = 0
+    signals_created = 0
+
+    for (odds_id, best_bucket), group_signals in groups.items():
+        n_strategies = len(group_signals)
+        band_level = determine_band_level(n_strategies)
+
+        if band_level == 0:
+            continue
+
+        band_cfg = BAND_CONFIG[band_level]
+        strategy_id = band_cfg["strategy_id"]
+
+        # Get contributing strategy IDs
+        contributing_ids = sorted(set(s.strategy_id for s in group_signals))
+        contributing_str = ",".join(contributing_ids)
+
+        # Average the predicted probability distributions
+        avg_probs = average_distributions(group_signals)
+
+        # Compute consensus edge and market price for the agreed bucket
+        avg_model_prob = avg_probs.get(best_bucket, 0.0)
+        # Use mean market price from contributing signals (should be identical
+        # since they share the same odds_id, but average for safety)
+        avg_market_price = sum(
+            s.best_bucket_market_price for s in group_signals
+        ) / n_strategies
+        consensus_edge = avg_model_prob - avg_market_price
+
+        if consensus_edge <= 0:
+            logger.info(
+                "  [%s] %s/%s: %d strategies agree but consensus edge=%.3f <= 0, skipping",
+                strategy_id, odds_id[:8], best_bucket, n_strategies, consensus_edge,
+            )
+            continue
+
+        # Compute EV from averaged distribution
+        avg_ev = sum(
+            s.predicted_ev for s in group_signals
+        ) / n_strategies
+
+        # Count buckets with positive edge in the averaged distribution
+        n_with_edge = 0
+        for label, prob in avg_probs.items():
+            mp = 0.0
+            # Get market price from any contributing signal's odds
+            for s in group_signals:
+                if label in s.predicted_probs:
+                    mp = s.best_bucket_market_price if label == best_bucket else 0.0
+                    break
+            if prob - mp > 0.02:
+                n_with_edge += 1
+
+        # Compute Kelly wager with band-specific sizing
+        wager, kelly_f = compute_kelly_wager(
+            edge=consensus_edge,
+            market_price=avg_market_price,
+            kelly_fraction=band_cfg["kelly_fraction"],
+            max_bet_pct=band_cfg["max_bet_pct"],
+            bankroll=bankroll,
+            min_bet=min_bet,
+        )
+
+        # Collect edge range for metadata
+        edges = [s.best_bucket_edge for s in group_signals]
+        base_signal_ids = [s.signal_id for s in group_signals]
+
+        # Build feature summary with band metadata
+        feature_summary = {
+            "band_level": band_level,
+            "contributing_strategies": contributing_ids,
+            "n_strategies": n_strategies,
+            "edge_range": [round(min(edges), 4), round(max(edges), 4)],
+            "base_signal_ids": base_signal_ids,
+        }
+
+        signal = Signal(
+            odds_id=odds_id,
+            model_id=MODEL_ID,
+            strategy_id=strategy_id,
+            predicted_probs=avg_probs,
+            predicted_ev=avg_ev,
+            best_bucket=best_bucket,
+            best_bucket_edge=consensus_edge,
+            best_bucket_model_prob=avg_model_prob,
+            best_bucket_market_price=avg_market_price,
+            meets_criteria=True,
+            n_buckets_with_edge=n_with_edge,
+            kelly_fraction=min(kelly_f, 1.0),
+            recommended_wager=wager,
+            strategy_ids=contributing_str,
+            n_strategies=n_strategies,
+            feature_summary=feature_summary,
+        )
+
+        signal_id = tracker.record_signal(signal)
+        signals_created += 1
+
+        if band_level == 1:
+            band_1_count += 1
+        else:
+            band_2_count += 1
+
+        logger.info(
+            "  [%s] odds=%s bucket=%s edge=%.3f wager=$%.2f (%d strategies: %s)",
+            strategy_id,
+            odds_id[:8],
+            best_bucket,
+            consensus_edge,
+            wager,
+            n_strategies,
+            contributing_str,
+        )
+
+        # Resolve event_slug from the odds snapshot for dedup check
+        odds_obj = tracker.get_odds(odds_id)
+        event_slug = odds_obj.event_slug if odds_obj else ""
+
+        # Check for existing position before placing betslip
+        if event_slug and tracker.has_open_position(event_slug, best_bucket):
+            logger.info(
+                "  Already have open position on %s/%s, skipping betslip",
+                event_slug,
+                best_bucket,
+            )
+            continue
+
+        # Place paper trade if auto_bet enabled
+        if auto_bet_enabled:
+            try:
+                betslip_id = tracker.create_betslip_from_signal(
+                    signal_id, placed_by="paper"
+                )
+                tracker.add_fill(
+                    betslip_id, price=avg_market_price, amount=wager
+                )
+                betslips_placed += 1
+                logger.info(
+                    "  Placed paper bet: %s ($%.2f on %s @ %.3f)",
+                    betslip_id,
+                    wager,
+                    best_bucket,
+                    avg_market_price,
+                )
+            except Exception as e:
+                logger.error("  Betslip creation failed: %s", e)
+
+    # Summary
+    print()
+    print("=" * 55)
+    print("  BAND SIGNAL SUMMARY")
+    print("=" * 55)
+    print("  Base signals found:     {:>4d}".format(len(base_signals)))
+    print("  Unique (event,bucket):  {:>4d}".format(len(groups)))
+    print("  Band 1 signals (4+):    {:>4d}".format(band_1_count))
+    print("  Band 2 signals (2-3):   {:>4d}".format(band_2_count))
+    print("  Total band signals:     {:>4d}".format(signals_created))
+    print("  Betslips placed:        {:>4d}".format(betslips_placed))
+    if args.dry_run:
+        print("  (dry-run mode -- no betslips created)")
+    elif not auto_bet_enabled:
+        print("  (auto_bet disabled in config/pipeline.json)")
+    print("=" * 55)
+
+
+if __name__ == "__main__":
+    main()

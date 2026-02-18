@@ -891,6 +891,20 @@
       "status": "active",
       "created_at": "2026-02-16",
       "notes": "Residual learning over crowd prices. More conservative framing — crowd is already strong (Brier 0.81). Requires training before inference."
+    },
+    "strategy_bands_v1": {
+      "model_id": "strategy_bands_v1",
+      "model_name": "Strategy Bands Meta-Model",
+      "module_path": "",
+      "class_name": "",
+      "version": "v1",
+      "description": "Meta-model that aggregates base strategy signals by bucket agreement. Not a prediction model -- reads and aggregates existing signals via generate_band_signals.py.",
+      "approach": "meta_consensus",
+      "feature_group": "none",
+      "hyperparameters": {},
+      "status": "active",
+      "created_at": "2026-02-17",
+      "notes": "Not instantiated via ModelRegistry. Band logic lives in scripts/generate_band_signals.py."
     }
   }
 }

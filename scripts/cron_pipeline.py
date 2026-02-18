@@ -341,6 +341,24 @@ def main():
         logger.warning("generate_signals.py not importable, skipping")
         results["signals"] = False
 
+    # Step 4b: Generate band signals (consensus across strategies)
+    band_argv = ["generate_band_signals.py"]
+    if args.dry_run:
+        band_argv.append("--dry-run")
+    try:
+        from scripts.generate_band_signals import main as generate_band_signals_main
+        results["band_signals"] = run_step(
+            "Generate Band Signals", generate_band_signals_main,
+            argv_override=band_argv,
+        )
+    except ImportError:
+        logger.warning("generate_band_signals.py not importable, skipping")
+        results["band_signals"] = False
+    except Exception:
+        logger.warning("Generate Band Signals failed (non-critical), continuing")
+        logger.warning(traceback.format_exc())
+        results["band_signals"] = False
+
     # Step 5: Settle bets
     try:
         from scripts.settle_bets import main as settle_main

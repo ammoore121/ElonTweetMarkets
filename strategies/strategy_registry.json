@@ -1,6 +1,6 @@
 {
-  "version": "5.0",
-  "updated_at": "2026-02-16",
+  "version": "6.0",
+  "updated_at": "2026-02-17",
   "strategies": {
     "tail_boost_primary": {
       "strategy_id": "tail_boost_primary",
@@ -589,6 +589,62 @@
       },
       "created_at": "2026-02-16",
       "notes": "Restricted to daily/short markets where cross-market divergence signal is strongest. Higher min_edge (3%) and lower sizing to manage bronze-tier risk."
+    },
+    "band_1_aggressive": {
+      "strategy_id": "band_1_aggressive",
+      "strategy_name": "Strategy Band 1 (High Confidence)",
+      "model_id": "strategy_bands_v1",
+      "status": "paper",
+      "description": "Meta-strategy: 4+ base strategies agree on same bucket. 0.30 Kelly (calibrated from sizing analysis: consensus edges ~= base edges, modest premium for coordination).",
+      "filters": {
+        "min_edge": 0.02,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": ["weekly", "daily", "short"],
+        "min_duration_days": 1,
+        "require_temporal_features": false
+      },
+      "sizing": {
+        "kelly_fraction": 0.30,
+        "max_bet_pct": 0.06,
+        "min_bet": 10.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "created_at": "2026-02-17",
+      "notes": "Meta-strategy. Runs via generate_band_signals.py after base signal generation. Requires 4+ strategies to agree on same bucket."
+    },
+    "band_2_moderate": {
+      "strategy_id": "band_2_moderate",
+      "strategy_name": "Strategy Band 2 (Medium Confidence)",
+      "model_id": "strategy_bands_v1",
+      "status": "inactive",
+      "description": "Meta-strategy: 2-3 base strategies agree on same bucket. Quarter-Kelly sizing.",
+      "filters": {
+        "min_edge": 0.02,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": ["weekly", "daily", "short"],
+        "min_duration_days": 1,
+        "require_temporal_features": false
+      },
+      "sizing": {
+        "kelly_fraction": 0.25,
+        "max_bet_pct": 0.05,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "created_at": "2026-02-17",
+      "notes": "Meta-strategy. Standard sizing when 2-3 strategies agree."
     }
   }
 }

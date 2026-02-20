@@ -2,7 +2,7 @@
 Comprehensive factor registry for Elon Musk tweet count prediction.
 ====================================================================
 
-Defines ~56 predictive factors organized by category, with metadata,
+Defines ~69 predictive factors organized by category, with metadata,
 computation formulas, rationale, and data-source references. This module
 serves as the single source of truth for which features the model consumes.
 
@@ -14,6 +14,10 @@ Categories:
     cross      - Interaction features combining multiple raw signals
     financial  - Tesla stock and crypto (DOGE, BTC) price/volatility signals
     attention  - Wikipedia pageview signals as public attention proxies
+    trends     - Google Trends search interest signals
+    government - Federal Register + GovTrack event signals
+    corporate  - Corporate events (earnings, launches) from yfinance + SEC EDGAR
+    reddit     - Reddit community activity signals
 
 Usage:
     from src.features.factor_registry import FACTOR_REGISTRY, print_factor_summary
@@ -39,7 +43,7 @@ class Factor:
     """A single predictive factor (feature) definition."""
 
     name: str
-    category: str  # temporal | media | calendar | market | cross | financial | attention
+    category: str  # temporal | media | calendar | market | cross | financial | attention | trends | government | corporate | reddit
     description: str
     formula: str
     rationale: str
@@ -1318,12 +1322,193 @@ TRENDS_FACTORS: List[Factor] = [
 
 
 # ---------------------------------------------------------------------------
+# GOVERNMENT factors (3)
+# Derived from Federal Register + GovTrack (data/sources/government/events.parquet)
+# ---------------------------------------------------------------------------
+GOVERNMENT_FACTORS: List[Factor] = [
+    Factor(
+        name="govt_event_flag_7d",
+        category="government",
+        description="Binary: any government event in 7 days before event start",
+        formula="1 if any govt event in [t-7, t), else 0",
+        rationale="Government actions (exec orders, rules) may trigger Elon tweets.",
+        data_source="Federal Register + GovTrack (data/sources/government/events.parquet)",
+        coverage_pct=95.0,
+        expected_range="0 or 1",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="govt_event_count_trailing_7d",
+        category="government",
+        description="Count of government events in 7 days before event start",
+        formula="count(govt_events in [t-7, t))",
+        rationale="Higher government activity density may increase tweet volume.",
+        data_source="Federal Register + GovTrack (data/sources/government/events.parquet)",
+        coverage_pct=95.0,
+        expected_range="0-10",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="govt_exec_order_flag_7d",
+        category="government",
+        description="Binary: any executive order in 7 days before event start",
+        formula="1 if any exec order in [t-7, t), else 0",
+        rationale="Executive orders are high-salience events that may provoke Elon response.",
+        data_source="Federal Register + GovTrack (data/sources/government/events.parquet)",
+        coverage_pct=95.0,
+        expected_range="0 or 1",
+        existing=True,
+        priority="medium",
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# CORPORATE factors (3)
+# Derived from yfinance + SEC EDGAR (data/sources/calendar/corporate_events.parquet)
+# ---------------------------------------------------------------------------
+CORPORATE_FACTORS: List[Factor] = [
+    Factor(
+        name="corporate_event_flag_7d",
+        category="corporate",
+        description="Binary: any corporate event in 7d around event window",
+        formula="1 if any corporate event in [t-7, t_end+7], else 0",
+        rationale="Corporate events (earnings, launches) may modulate tweet behavior.",
+        data_source="yfinance + SEC EDGAR (data/sources/calendar/corporate_events.parquet)",
+        coverage_pct=95.0,
+        expected_range="0 or 1",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="corporate_event_count_7d",
+        category="corporate",
+        description="Count of corporate events in 7d around event window",
+        formula="count(corporate_events in [t-7, t_end+7])",
+        rationale="Multiple corporate events may amplify tweet activity.",
+        data_source="yfinance + SEC EDGAR (data/sources/calendar/corporate_events.parquet)",
+        coverage_pct=95.0,
+        expected_range="0-5",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="tesla_earnings_flag_14d",
+        category="corporate",
+        description="Binary: Tesla earnings within 14d of event start",
+        formula="1 if Tesla earnings in [t-14, t+14], else 0",
+        rationale="Tesla earnings are high-attention events driving Elon activity.",
+        data_source="yfinance + SEC EDGAR (data/sources/calendar/corporate_events.parquet)",
+        coverage_pct=95.0,
+        expected_range="0 or 1",
+        existing=True,
+        priority="high",
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# REDDIT factors (7)
+# Derived from Reddit API (data/sources/reddit/daily_activity.parquet)
+# ---------------------------------------------------------------------------
+REDDIT_FACTORS: List[Factor] = [
+    Factor(
+        name="reddit_total_posts_7d",
+        category="reddit",
+        description="Total posts across all subreddits (trailing 7d)",
+        formula="sum(posts across r/elonmusk, r/teslamotors, r/SpaceX, r/dogecoin, r/technology) for [t-7, t)",
+        rationale="Aggregate Reddit post volume as community attention proxy.",
+        data_source="Reddit API (data/sources/reddit/daily_activity.parquet)",
+        coverage_pct=95.0,
+        expected_range="50-500",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="reddit_total_comments_7d",
+        category="reddit",
+        description="Total comments across all subreddits (trailing 7d)",
+        formula="sum(comments across subreddits) for [t-7, t)",
+        rationale="Comment volume as engagement intensity proxy.",
+        data_source="Reddit API (data/sources/reddit/daily_activity.parquet)",
+        coverage_pct=95.0,
+        expected_range="500-10000",
+        existing=True,
+        priority="low",
+    ),
+    Factor(
+        name="reddit_post_delta",
+        category="reddit",
+        description="Reddit post momentum: (3d avg - 7d avg) / 7d avg",
+        formula="(mean(posts[t-3:t-1]) - mean(posts[t-7:t-1])) / mean(posts[t-7:t-1])",
+        rationale="Spike in Reddit posting activity may foreshadow tweet activity.",
+        data_source="Reddit API (data/sources/reddit/daily_activity.parquet)",
+        coverage_pct=95.0,
+        expected_range="-0.50 to +1.00",
+        existing=True,
+        priority="medium",
+    ),
+    Factor(
+        name="reddit_elonmusk_posts_7d",
+        category="reddit",
+        description="Posts in r/elonmusk (trailing 7d avg)",
+        formula="mean(r/elonmusk daily posts) for [t-7, t)",
+        rationale="Direct Elon community activity level.",
+        data_source="Reddit API (data/sources/reddit/daily_activity.parquet)",
+        coverage_pct=95.0,
+        expected_range="0-50",
+        existing=True,
+        priority="high",
+    ),
+    Factor(
+        name="reddit_teslamotors_posts_7d",
+        category="reddit",
+        description="Posts in r/teslamotors (trailing 7d avg)",
+        formula="mean(r/teslamotors daily posts) for [t-7, t)",
+        rationale="Tesla community activity as attention proxy.",
+        data_source="Reddit API (data/sources/reddit/daily_activity.parquet)",
+        coverage_pct=95.0,
+        expected_range="0-100",
+        existing=True,
+        priority="low",
+    ),
+    Factor(
+        name="reddit_attention_concentration",
+        category="reddit",
+        description="Herfindahl index of post volume across subreddits",
+        formula="sum((sub_posts / total_posts)^2)",
+        rationale="Concentrated attention vs spread. High = one subreddit dominates.",
+        data_source="Reddit API (data/sources/reddit/daily_activity.parquet)",
+        coverage_pct=95.0,
+        expected_range="0.20-1.0",
+        existing=True,
+        priority="low",
+    ),
+    Factor(
+        name="reddit_top_score_7d",
+        category="reddit",
+        description="Avg top_post_score across subreddits (trailing 7d)",
+        formula="mean(top_post_score across subreddits) for [t-7, t)",
+        rationale="Viral post engagement as attention intensity proxy.",
+        data_source="Reddit API (data/sources/reddit/daily_activity.parquet)",
+        coverage_pct=95.0,
+        expected_range="0-5000",
+        existing=True,
+        priority="low",
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
 # COMPLETE REGISTRY
 # ---------------------------------------------------------------------------
 FACTOR_REGISTRY: List[Factor] = (
     TEMPORAL_FACTORS + MEDIA_FACTORS + CALENDAR_FACTORS
     + MARKET_FACTORS + CROSS_FACTORS + FINANCIAL_FACTORS
     + VIX_FACTORS + CRYPTO_FG_FACTORS + ATTENTION_FACTORS + TRENDS_FACTORS
+    + GOVERNMENT_FACTORS + CORPORATE_FACTORS + REDDIT_FACTORS
 )
 
 # Quick-lookup by name
@@ -1360,7 +1545,8 @@ def print_factor_summary() -> None:
 
     idx = 1
     for category in ["temporal", "media", "calendar", "market", "cross",
-                      "financial", "attention", "trends"]:
+                      "financial", "attention", "trends", "government",
+                      "corporate", "reddit"]:
         factors = FACTORS_BY_CATEGORY.get(category, [])
         if not factors:
             continue
@@ -1455,7 +1641,8 @@ def validate_registry() -> bool:
 
     # Check valid categories
     valid_cats = {"temporal", "media", "calendar", "market", "cross",
-                   "financial", "attention", "trends"}
+                   "financial", "attention", "trends", "government",
+                   "corporate", "reddit"}
     bad_cats = [f.name for f in FACTOR_REGISTRY if f.category not in valid_cats]
     if bad_cats:
         print("  FAIL: Invalid categories for: {}".format(bad_cats))

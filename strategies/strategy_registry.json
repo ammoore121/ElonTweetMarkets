@@ -276,15 +276,16 @@
         "entry_window_hours": 6
       },
       "backtest_summary": {
-        "tier": "gold",
-        "n_events": 38,
-        "n_bets": 0,
-        "brier": 0.801097,
-        "roi_pct": 0.0,
-        "notes": "Auto-updated from run_backtest.py"
+        "tier": "all",
+        "n_events": 159,
+        "n_bets": 188,
+        "brier": 0.5916,
+        "roi_pct": 17.7,
+        "pnl": 394.9,
+        "min_edge": 0.02
       },
       "created_at": "2026-02-15",
-      "notes": "Highest P&L of any strategy. require_temporal_features=false since financial+attention features have 98.7% coverage."
+      "notes": "Highest P&L of any single-model strategy. require_temporal_features=false since financial+attention features have 98.7% coverage."
     },
     "signal_enhanced_selective": {
       "strategy_id": "signal_enhanced_selective",
@@ -378,7 +379,11 @@
         "max_edge": 0.3,
         "min_bucket_price": 0.02,
         "max_bucket_price": 0.5,
-        "market_types": ["weekly", "daily", "short"],
+        "market_types": [
+          "weekly",
+          "daily",
+          "short"
+        ],
         "min_duration_days": 1,
         "require_temporal_features": false
       },
@@ -413,7 +418,11 @@
         "max_edge": 0.3,
         "min_bucket_price": 0.02,
         "max_bucket_price": 0.5,
-        "market_types": ["weekly", "daily", "short"],
+        "market_types": [
+          "weekly",
+          "daily",
+          "short"
+        ],
         "min_duration_days": 1,
         "require_temporal_features": false
       },
@@ -448,7 +457,11 @@
         "max_edge": 0.3,
         "min_bucket_price": 0.02,
         "max_bucket_price": 0.5,
-        "market_types": ["weekly", "daily", "short"],
+        "market_types": [
+          "weekly",
+          "daily",
+          "short"
+        ],
         "min_duration_days": 1,
         "require_temporal_features": false
       },
@@ -461,6 +474,14 @@
       "entry": {
         "hours_before_close": 24,
         "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "cv",
+        "n_events": 159,
+        "n_bets": 267,
+        "roi_pct": -20.4,
+        "n_folds": 5,
+        "notes": "Walk-forward CV. Overfits \u2014 raw classification produces too many false edges."
       },
       "created_at": "2026-02-16",
       "notes": "First real ML strategy. Run scripts/train_xgb_model.py --retrain before deployment."
@@ -476,7 +497,11 @@
         "max_edge": 0.3,
         "min_bucket_price": 0.02,
         "max_bucket_price": 0.5,
-        "market_types": ["weekly", "daily", "short"],
+        "market_types": [
+          "weekly",
+          "daily",
+          "short"
+        ],
         "min_duration_days": 1,
         "require_temporal_features": false
       },
@@ -489,6 +514,15 @@
       "entry": {
         "hours_before_close": 24,
         "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "cv",
+        "n_events": 159,
+        "n_bets": 161,
+        "roi_pct": 28.4,
+        "pnl": 826,
+        "n_folds": 5,
+        "notes": "Walk-forward CV results. Best ML model."
       },
       "created_at": "2026-02-16",
       "notes": "Residual learning: predicts correction to crowd prices. Run scripts/train_xgb_model.py --retrain --framing residual before deployment."
@@ -504,7 +538,11 @@
         "max_edge": 0.3,
         "min_bucket_price": 0.02,
         "max_bucket_price": 0.5,
-        "market_types": ["weekly", "daily", "short"],
+        "market_types": [
+          "weekly",
+          "daily",
+          "short"
+        ],
         "min_duration_days": 1,
         "require_temporal_features": false
       },
@@ -533,13 +571,17 @@
       "strategy_name": "Signal-Enhanced V6 (12-Signal + Reddit)",
       "model_id": "signal_enhanced_tail_v6",
       "status": "inactive",
-      "description": "V6 model with 12 signals (v5 + Reddit post spike + r/elonmusk activity). Newest signal model — no backtest yet, paper trade for live validation.",
+      "description": "V6 model with 12 signals (v5 + Reddit post spike + r/elonmusk activity). Newest signal model \u2014 no backtest yet, paper trade for live validation.",
       "filters": {
         "min_edge": 0.02,
         "max_edge": 0.3,
         "min_bucket_price": 0.02,
         "max_bucket_price": 0.5,
-        "market_types": ["weekly", "daily", "short"],
+        "market_types": [
+          "weekly",
+          "daily",
+          "short"
+        ],
         "min_duration_days": 1,
         "require_temporal_features": false
       },
@@ -552,6 +594,10 @@
       "entry": {
         "hours_before_close": 24,
         "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "n/a",
+        "notes": "No backtest yet \u2014 newest model, paper-trade for live validation."
       },
       "created_at": "2026-02-16",
       "notes": "Newest model, no backtest history. Reduced max_bet_pct (3%) for conservative sizing during validation."
@@ -567,12 +613,15 @@
         "max_edge": 0.3,
         "min_bucket_price": 0.02,
         "max_bucket_price": 0.5,
-        "market_types": ["daily", "short"],
+        "market_types": [
+          "daily",
+          "short"
+        ],
         "min_duration_days": 1,
         "require_temporal_features": false
       },
       "sizing": {
-        "kelly_fraction": 0.20,
+        "kelly_fraction": 0.2,
         "max_bet_pct": 0.04,
         "min_bet": 5.0,
         "bankroll": 1000.0
@@ -601,12 +650,16 @@
         "max_edge": 0.3,
         "min_bucket_price": 0.02,
         "max_bucket_price": 0.5,
-        "market_types": ["weekly", "daily", "short"],
+        "market_types": [
+          "weekly",
+          "daily",
+          "short"
+        ],
         "min_duration_days": 1,
         "require_temporal_features": false
       },
       "sizing": {
-        "kelly_fraction": 0.30,
+        "kelly_fraction": 0.3,
         "max_bet_pct": 0.06,
         "min_bet": 10.0,
         "bankroll": 1000.0
@@ -614,6 +667,10 @@
       "entry": {
         "hours_before_close": 24,
         "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "n/a",
+        "notes": "Meta-strategy: not directly backtestable. Aggregates live signals from base strategies."
       },
       "created_at": "2026-02-17",
       "notes": "Meta-strategy. Runs via generate_band_signals.py after base signal generation. Requires 4+ strategies to agree on same bucket."
@@ -629,7 +686,11 @@
         "max_edge": 0.3,
         "min_bucket_price": 0.02,
         "max_bucket_price": 0.5,
-        "market_types": ["weekly", "daily", "short"],
+        "market_types": [
+          "weekly",
+          "daily",
+          "short"
+        ],
         "min_duration_days": 1,
         "require_temporal_features": false
       },
@@ -643,8 +704,60 @@
         "hours_before_close": 24,
         "entry_window_hours": 6
       },
+      "backtest_summary": {
+        "tier": "n/a",
+        "notes": "Meta-strategy: not directly backtestable. Aggregates live signals from base strategies."
+      },
       "created_at": "2026-02-17",
       "notes": "Meta-strategy. Standard sizing when 2-3 strategies agree."
+    },
+    "directional_signal_primary": {
+      "strategy_id": "directional_signal_primary",
+      "strategy_name": "Directional Signal (Primary)",
+      "model_id": "directional_signal_v1",
+      "status": "paper",
+      "description": "First directional model in paper trading. Uses signed DOGE/launches/tone/attention signals to predict UP/DOWN shift before applying tail boost. Deployed at 2% min_edge for volume.",
+      "filters": {
+        "min_edge": 0.02,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": [
+          "weekly",
+          "daily",
+          "short"
+        ],
+        "min_duration_days": 1,
+        "require_temporal_features": false
+      },
+      "sizing": {
+        "kelly_fraction": 0.25,
+        "max_bet_pct": 0.05,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "all",
+        "n_events": 159,
+        "n_bets": 147,
+        "roi_pct": 7.7,
+        "pnl": 126.0,
+        "min_edge": 0.02,
+        "gold_roi_pct": 64.2,
+        "silver_roi_pct": 244.5,
+        "bronze_roi_pct": -29.6,
+        "at_5pct_edge": {
+          "n_bets": 23,
+          "roi_pct": 75.1,
+          "pnl": 381.6
+        }
+      },
+      "created_at": "2026-02-20",
+      "notes": "First model with directional prediction. Strong on gold/silver, weaker on bronze. At 5% edge: +75.1% ROI."
     }
   }
 }

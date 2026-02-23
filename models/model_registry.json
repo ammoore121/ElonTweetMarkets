@@ -1133,6 +1133,41 @@
       "status": "active",
       "created_at": "2026-02-20",
       "notes": "First model with genuine directional prediction. At 5% min_edge: +75.1% ROI, 23 bets, +$382 P&L. At 2% min_edge: +7.7% ROI."
+    },
+    "crowd_hedged_v1": {
+      "model_id": "crowd_hedged_v1",
+      "model_name": "Crowd-Hedged Blend",
+      "module_path": "src.ml.crowd_hedged_model",
+      "class_name": "CrowdHedgedModel",
+      "version": "v1",
+      "description": "Blends crowd prices (20%) with ConsensusEnsemble (80%). Crowd anchor filters weak-edge bets, keeping only highest-conviction positions. Gold: +86.2% ROI (37 bets) vs CE +71.0% (58 bets).",
+      "approach": "crowd_hedged_blend",
+      "feature_group": "full",
+      "required_features": [
+        "temporal",
+        "media",
+        "calendar",
+        "market",
+        "financial",
+        "attention"
+      ],
+      "hyperparameters": {
+        "crowd_weight": 0.2
+      },
+      "data_sources": [
+        "xtracker",
+        "polymarket_clob",
+        "gdelt",
+        "spacex",
+        "tesla",
+        "crypto",
+        "wikipedia",
+        "vix",
+        "crypto_fg"
+      ],
+      "status": "active",
+      "created_at": "2026-02-21",
+      "notes": "Crowd-hedged w=0.20: 20% crowd anchor filters weak edges. Gold backtest: +86.2% ROI, 37 bets, +$266 P&L at 0.25 Kelly. Sized up at 0.40 Kelly: +$426 P&L."
     }
   }
 }

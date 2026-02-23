@@ -758,6 +758,46 @@
       },
       "created_at": "2026-02-20",
       "notes": "First model with directional prediction. Strong on gold/silver, weaker on bronze. At 5% edge: +75.1% ROI."
+    },
+    "crowd_hedged_primary": {
+      "strategy_id": "crowd_hedged_primary",
+      "strategy_name": "Crowd-Hedged Primary (Filtered High-Conviction)",
+      "model_id": "crowd_hedged_v1",
+      "status": "paper",
+      "description": "CrowdHedged w=0.20 at kelly=0.40. 20%% crowd anchor filters weak edges from ConsensusEnsemble, keeping only highest-conviction bets. Gold backtest: +86.2%% ROI (37 bets) vs CE +71.0%% (58 bets). Sized up to deploy similar capital.",
+      "filters": {
+        "min_edge": 0.02,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": [
+          "weekly",
+          "daily",
+          "short"
+        ],
+        "min_duration_days": 1,
+        "require_temporal_features": true
+      },
+      "sizing": {
+        "kelly_fraction": 0.4,
+        "max_bet_pct": 0.1,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "gold",
+        "n_events": 38,
+        "n_bets": 37,
+        "brier": 0.803064,
+        "roi_pct": 86.21,
+        "notes": "Auto-updated from run_backtest.py"
+      },
+      "created_at": "2026-02-21",
+      "notes": "Strict subset of ConsensusEnsemble bets. All 37 CH bets are also CE bets; the 21 filtered-out CE bets contributed only +$28. Higher Kelly justified by higher-quality bet selection."
     }
   }
 }

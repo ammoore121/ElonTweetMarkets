@@ -45,6 +45,7 @@ from src.ml.consensus_model import ConsensusEnsembleModel
 from src.ml.gradient_boost_model import XGBoostBucketModel, XGBoostResidualModel
 from src.ml.directional_model import DirectionalSignalModel
 from src.ml.directional_ensemble_model import DirectionalConsensusEnsemble
+from src.ml.crowd_hedged_model import CrowdHedgedModel
 from src.ml.registry import ModelRegistry, StrategyRegistry
 
 # ---------------------------------------------------------------------------
@@ -76,6 +77,7 @@ MODEL_MAP = {
     "xgb_residual": XGBoostResidualModel,
     "directional_signal": DirectionalSignalModel,
     "directional_consensus": DirectionalConsensusEnsemble,
+    "crowd_hedged": CrowdHedgedModel,
 }
 
 # Maps model_id from registry to MODEL_MAP key for instantiation
@@ -99,6 +101,7 @@ MODEL_ID_TO_KEY = {
     "xgb_residual_v1": "xgb_residual",
     "directional_signal_v1": "directional_signal",
     "directional_consensus_v1": "directional_consensus",
+    "crowd_hedged_v1": "crowd_hedged",
 }
 
 

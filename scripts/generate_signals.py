@@ -24,6 +24,7 @@ sys.path.insert(0, str(PROJECT_DIR))
 
 from src.ml.registry import ModelRegistry, StrategyRegistry
 from src.features.feature_builder import TweetFeatureBuilder
+from src.monitoring.health_check import SignalHealthCheck
 from src.paper_trading.schemas import Signal
 from src.paper_trading.tracker import PerformanceTracker
 
@@ -156,10 +157,24 @@ def main():
         odds_dir=str(PROJECT_DIR / "data" / "odds"),
         signals_dir=str(PROJECT_DIR / "data" / "signals"),
     )
+    health_check = SignalHealthCheck()
+
+    # Pre-signal data freshness check (once at startup)
+    freshness = health_check.check_data_freshness()
+    if not freshness["passed"]:
+        for src in freshness["stale_sources"]:
+            logger.warning("STALE DATA: %s last modified %s (%.1f days ago, threshold %d)",
+                           src["source"], src["last_modified"],
+                           src["days_stale"], src["threshold_days"])
+        for src in freshness["missing_sources"]:
+            logger.warning("MISSING DATA: %s not found on disk", src)
+    else:
+        logger.info("Data freshness check: all sources OK")
 
     total_signals = 0
     actionable_signals = 0
     betslips_placed = 0
+    events_skipped_health = 0
 
     for event_slug, buckets_df in event_groups:
         first = buckets_df.iloc[0]
@@ -185,6 +200,24 @@ def main():
         except Exception as e:
             logger.warning("Feature build failed for %s: %s", event_slug, e)
             continue
+
+        # Health check: validate feature completeness before generating signals
+        completeness = health_check.check_feature_completeness(features)
+        if not completeness["passed"]:
+            logger.warning("SKIPPING %s: critical features missing: %s (completeness %.0f%%)",
+                           event_slug, completeness["missing_critical"],
+                           completeness["completeness_pct"] * 100)
+            events_skipped_health += 1
+            continue
+        if completeness["missing_optional"]:
+            logger.info("  Optional features missing for %s: %s",
+                        event_slug, completeness["missing_optional"])
+
+        # Health check: regime alignment (warn but don't block)
+        regime = health_check.check_regime_alignment(features)
+        if not regime["passed"]:
+            for w in regime["warnings"]:
+                logger.warning("  %s: %s", event_slug, w)
 
         # Build bucket list for model (matching backtest engine format)
         buckets = []
@@ -307,10 +340,11 @@ def main():
             if meets:
                 actionable_signals += 1
 
-                # Check for existing position
-                if tracker.has_open_position(str(event_slug), best_bucket):
-                    logger.info("  Already have open position on %s/%s, skipping betslip",
-                                event_slug, best_bucket)
+                # Check for existing position: max 1 bet per event per strategy,
+                # regardless of which bucket the model currently favours.
+                if tracker.has_open_position(str(event_slug), strategy_id=strategy_id):
+                    logger.info("  Already have open position on %s for strategy %s, skipping betslip",
+                                event_slug, strategy_id)
                     continue
 
                 # Place paper trade if auto_bet enabled
@@ -331,6 +365,8 @@ def main():
     print("=" * 55)
     print("  Strategies run:     {:>4d}".format(len(strategies)))
     print("  Events processed:   {:>4d}".format(len(event_groups)))
+    if events_skipped_health > 0:
+        print("  Skipped (health):   {:>4d}".format(events_skipped_health))
     print("  Signals generated:  {:>4d}".format(total_signals))
     print("  Meet criteria:      {:>4d}".format(actionable_signals))
     print("  Betslips placed:    {:>4d}".format(betslips_placed))

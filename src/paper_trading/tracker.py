@@ -332,18 +332,32 @@ class PerformanceTracker:
         return [Betslip.from_dict(row.to_dict()) for _, row in unsettled.iterrows()]
 
     def has_open_position(
-        self, event_slug: str, bucket_label: Optional[str] = None
+        self, event_slug: str, strategy_id: Optional[str] = None
     ) -> bool:
-        """Check if we already have an open position on an event/bucket.
+        """Check if a strategy already has an open position on an event.
 
-        Used for deduplication: don't bet the same market twice.
-        If bucket_label is None, checks for any open position on the event.
+        Used for deduplication: a strategy may only place 1 bet per event,
+        regardless of which bucket it targets. Different strategies are
+        independent and may each have their own position on the same event.
+
+        If strategy_id is None, checks for any open position on the event
+        across all strategies (used for event-level checks).
+
+        The uniqueness key is (event_slug, strategy_id): one bet per event
+        per strategy, enforced by looking up the strategy_id stored on the
+        signal that originated each open betslip.
         """
         open_bets = self.get_open_betslips()
         for bet in open_bets:
-            if bet.event_slug == event_slug:
-                if bucket_label is None or bet.bucket_label == bucket_label:
-                    return True
+            if bet.event_slug != event_slug:
+                continue
+            if strategy_id is None:
+                # No strategy filter: any open position on this event matches
+                return True
+            # Resolve strategy_id through the signal that created this betslip
+            signal = self.get_signal(bet.signal_id)
+            if signal is not None and signal.strategy_id == strategy_id:
+                return True
         return False
 
     def get_betslips_for_event(self, event_slug: str) -> list[Betslip]:

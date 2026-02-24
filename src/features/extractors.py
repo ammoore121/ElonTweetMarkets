@@ -178,6 +178,10 @@ def compute_temporal_features(
         "weekend_ratio_7d": None,
         "day_of_week_sin": None,
         "day_of_week_cos": None,
+        # Sparse-data-aware features (Issue #5)
+        "data_coverage_7d": None,
+        "data_coverage_14d": None,
+        "rolling_avg_7d_calendar": None,
     }
 
     if not xtracker_daily or not event_start_date:
@@ -220,6 +224,24 @@ def compute_temporal_features(
                 pairs.append((d, float(entry["count"])))
         return pairs
 
+    # Helper: calendar-day average (sum of ALL counts including zeros / n_days)
+    def get_trailing_total_and_coverage(n_days: int) -> tuple:
+        """Return (total_count, n_entries_with_data) for N trailing calendar days.
+
+        Unlike get_trailing_counts() which skips zero-count days (correct for
+        filtering noon-to-noon artifacts), this sums ALL entries and divides
+        by calendar days to give a conservative daily average.
+        """
+        dates = _trailing_dates(event_start_date, n_days)
+        total = 0.0
+        n_with_data = 0
+        for d in dates:
+            entry = xtracker_daily.get(d)
+            if entry is not None:
+                total += float(entry["count"])
+                n_with_data += 1
+        return total, n_with_data
+
     # Yesterday
     yesterday = _trailing_dates(event_start_date, 1)
     if yesterday:
@@ -237,6 +259,13 @@ def compute_temporal_features(
     features["rolling_avg_28d"] = _safe_mean(counts_28) if counts_28 else None
     features["rolling_std_7d"] = _safe_std(counts_7) if len(counts_7) >= 2 else None
     features["rolling_std_14d"] = _safe_std(counts_14) if len(counts_14) >= 2 else None
+
+    # --- Sparse-data-aware features (Issue #5) ---
+    total_7, n_data_7 = get_trailing_total_and_coverage(7)
+    total_14, n_data_14 = get_trailing_total_and_coverage(14)
+    features["data_coverage_7d"] = round(n_data_7 / 7, 4)
+    features["data_coverage_14d"] = round(n_data_14 / 14, 4)
+    features["rolling_avg_7d_calendar"] = round(total_7 / 7, 2) if n_data_7 > 0 else None
 
     # Trends (use chronological order for regression)
     counts_7_chrono = list(reversed(counts_7))

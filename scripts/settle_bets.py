@@ -20,6 +20,7 @@ PROJECT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_DIR))
 
 from src.data_sources.xtracker.client import XTrackerClient
+from src.monitoring.strategy_monitor import StrategyMonitor
 from src.paper_trading.tracker import PerformanceTracker
 
 logging.basicConfig(
@@ -220,6 +221,31 @@ def main():
     print("  Bets settled:      {:>4d}".format(settled_count))
     print("  Bets skipped:      {:>4d}".format(skipped_count))
     print("=" * 55)
+
+    # Post-settlement strategy health monitor
+    if settled_count > 0:
+        monitor = StrategyMonitor()
+        alerts = monitor.check_strategy_health(tracker)
+        if alerts:
+            print()
+            print("=" * 55)
+            print("  STRATEGY HEALTH ALERTS")
+            print("=" * 55)
+            for alert in alerts:
+                severity = alert["severity"].upper()
+                logger.log(
+                    logging.CRITICAL if severity == "CRITICAL" else logging.WARNING,
+                    "[%s] %s: %s -- %s",
+                    severity, alert["strategy_id"],
+                    alert["message"], alert["recommendation"],
+                )
+                print("  [{}] {}: {}".format(
+                    severity, alert["strategy_id"], alert["message"]
+                ))
+                print("         -> {}".format(alert["recommendation"]))
+            print("=" * 55)
+        else:
+            logger.info("Strategy health check: all strategies OK")
 
     tracker.print_performance()
 

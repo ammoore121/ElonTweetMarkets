@@ -450,10 +450,13 @@ def test_full_pipeline():
             betslip.bucket_label, betslip.wager, betslip.shares
         ))
 
-        # Verify dedup
+        # Verify dedup: max 1 bet per event per strategy
+        # No strategy_id: any open position on the event -> True
         assert tracker.has_open_position("elon-musk-of-tweets-feb-10-16")
-        assert tracker.has_open_position("elon-musk-of-tweets-feb-10-16", best_bucket)
-        assert not tracker.has_open_position("elon-musk-of-tweets-feb-10-16", "0-39")
+        # Same strategy that placed the bet -> True (already have a position)
+        assert tracker.has_open_position("elon-musk-of-tweets-feb-10-16", strategy_id="edge_hunter")
+        # Different strategy -> False (that strategy has no position yet)
+        assert not tracker.has_open_position("elon-musk-of-tweets-feb-10-16", strategy_id="other_strategy")
         print("  Step 3c: Position dedup verified")
 
         # Unbetted signals should now be 0

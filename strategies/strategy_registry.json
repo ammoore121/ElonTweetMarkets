@@ -6,7 +6,8 @@
       "strategy_id": "tail_boost_primary",
       "strategy_name": "Tail Boost Primary (Most Trusted)",
       "model_id": "tail_boost_v1",
-      "status": "paper",
+      "status": "inactive",
+      "suspended_reason": "Regime shift: systematic upward bias in low-volume period. 1W/36L, -84.2% ROI. Re-evaluate after temporal feature fix (task #2). Suspended 2026-02-23.",
       "description": "Primary production strategy. TailBoost is most trusted due to highest bet volume (60 bets in backtest) giving strongest statistical confidence at +44.4% ROI.",
       "filters": {
         "min_edge": 0.02,
@@ -32,13 +33,12 @@
         "entry_window_hours": 6
       },
       "backtest_summary": {
-        "tier": "gold",
-        "n_events": 38,
-        "n_bets": 60,
-        "brier": 0.8022,
-        "roi_pct": 44.4,
-        "pnl": 248.56,
-        "min_edge": 0.02
+        "tier": "all",
+        "n_events": 159,
+        "n_bets": 187,
+        "brier": 0.588149,
+        "roi_pct": 13.92,
+        "notes": "Auto-updated from run_backtest.py"
       },
       "created_at": "2026-02-11",
       "notes": "Most trusted model. 60 bets in 38 events = trades frequently with consistent edge."
@@ -73,13 +73,12 @@
         "entry_window_hours": 6
       },
       "backtest_summary": {
-        "tier": "gold",
-        "n_events": 38,
-        "n_bets": 43,
-        "brier": 0.8016,
-        "roi_pct": 67.7,
-        "pnl": 289.42,
-        "min_edge": 0.02
+        "tier": "all",
+        "n_events": 159,
+        "n_bets": 133,
+        "brier": 0.593161,
+        "roi_pct": 13.82,
+        "notes": "Auto-updated from run_backtest.py"
       },
       "created_at": "2026-02-11",
       "notes": "Best absolute P&L. 43 bets is high confidence."
@@ -195,13 +194,12 @@
         "entry_window_hours": 6
       },
       "backtest_summary": {
-        "tier": "gold",
-        "n_events": 38,
-        "n_bets": 23,
-        "brier": 0.8095,
-        "roi_pct": 49.7,
-        "pnl": 125.43,
-        "min_edge": 0.02
+        "tier": "all",
+        "n_events": 159,
+        "n_bets": 47,
+        "brier": 0.594767,
+        "roi_pct": 21.51,
+        "notes": "Auto-updated from run_backtest.py"
       },
       "created_at": "2026-02-11",
       "notes": "Simplest model. Only trades daily/short markets where crowd overestimates."
@@ -439,9 +437,10 @@
       "backtest_summary": {
         "tier": "all",
         "n_events": 159,
-        "n_bets": 132,
-        "roi_pct": 37.0,
-        "total_pnl": 594.26
+        "n_bets": 170,
+        "brier": 0.589504,
+        "roi_pct": 22.33,
+        "notes": "Auto-updated from run_backtest.py"
       },
       "created_at": "2026-02-15",
       "notes": "Requires price_dynamics features. Uses TailBoost(0.30) + PriceDynamics(0.40) + SignalEnhanced v3(0.30)."
@@ -490,7 +489,8 @@
       "strategy_id": "xgb_residual_primary",
       "strategy_name": "XGBoost Residual Corrector",
       "model_id": "xgb_residual_v1",
-      "status": "paper",
+      "status": "inactive",
+      "suspended_reason": "Regime shift: XGB trained on crowd_ev ~293, live crowd_ev ~105. 0W/11L, -100% ROI. Requires retraining on post-Oct 2025 data. Suspended 2026-02-23.",
       "description": "Residual correction over crowd prices. More conservative framing. Requires training.",
       "filters": {
         "min_edge": 0.02,
@@ -643,8 +643,9 @@
       "strategy_id": "band_1_aggressive",
       "strategy_name": "Strategy Band 1 (High Confidence)",
       "model_id": "strategy_bands_v1",
-      "status": "paper",
-      "description": "Meta-strategy: 4+ base strategies agree on same bucket. 0.30 Kelly (calibrated from sizing analysis: consensus edges ~= base edges, modest premium for coordination).",
+      "status": "inactive",
+      "suspended_reason": "Suspended 2026-02-23. This registry ID ('band_1_aggressive') does not match what generate_band_signals.py emits. The code hardcodes strategy_id='band_1' (see BAND_CONFIG in scripts/generate_band_signals.py line 52). All live paper trading bets were recorded under 'band_1', not this ID. This entry has zero live history and is superseded by the 'band_1' entry. Kept for audit trail only.",
+      "description": "Registry alias that was never emitted by production code. generate_band_signals.py emits strategy_id='band_1'. Superseded by band_1 entry added 2026-02-23.",
       "filters": {
         "min_edge": 0.02,
         "max_edge": 0.3,
@@ -670,10 +671,49 @@
       },
       "backtest_summary": {
         "tier": "n/a",
-        "notes": "Meta-strategy: not directly backtestable. Aggregates live signals from base strategies."
+        "notes": "Never used in production. generate_band_signals.py emits 'band_1', not this ID."
       },
       "created_at": "2026-02-17",
-      "notes": "Meta-strategy. Runs via generate_band_signals.py after base signal generation. Requires 4+ strategies to agree on same bucket."
+      "suspended_at": "2026-02-23",
+      "notes": "Audit trail only. Superseded by band_1 entry."
+    },
+    "band_1": {
+      "strategy_id": "band_1",
+      "strategy_name": "Strategy Band 1 (High Confidence)",
+      "model_id": "strategy_bands_v1",
+      "status": "inactive",
+      "suspended_reason": "Suspended 2026-02-23. Live paper trading result: 0/3 wins, -100% ROI, -$101.67 P&L. Three failure mechanisms identified: (1) The 4+ strategy agreement threshold is almost never reached in live trading -- only 3 bets fired vs the broad bet volumes seen in historical backtest, making the band a near-dead letter in production. (2) Correlated base model failure: all contributing strategies (TailBoost, ConsensusEnsemble, PriceDynamics, SignalEnhanced) share the same crowd-EV anchor. When the crowd-EV anchor misfires in a live regime, all base strategies fail simultaneously and band_1 inherits the loss with amplified sizing (0.30 Kelly, 6% max bet) -- the opposite of independent consensus. (3) This entry was missing from the registry entirely when the strategy was live -- generate_band_signals.py emits strategy_id='band_1' but only 'band_1_aggressive' existed in the registry, creating a tracking and oversight gap. Reactivate conditions: (a) base strategies show sustained positive live P&L, (b) band threshold is re-validated on recent-period (Oct 2025+) events only, (c) base model diversity is improved so not all contributors share the same anchor.",
+      "description": "Meta-strategy: 4+ base strategies agree on same bucket. 0.30 Kelly (calibrated from sizing analysis: consensus edges ~= base edges, modest premium for coordination). SUSPENDED -- see suspended_reason.",
+      "filters": {
+        "min_edge": 0.02,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": [
+          "weekly",
+          "daily",
+          "short"
+        ],
+        "min_duration_days": 1,
+        "require_temporal_features": false
+      },
+      "sizing": {
+        "kelly_fraction": 0.3,
+        "max_bet_pct": 0.06,
+        "min_bet": 10.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "n/a",
+        "notes": "Meta-strategy: not directly backtestable. Live result: 0/3 wins, -100% ROI, -$101.67."
+      },
+      "created_at": "2026-02-17",
+      "suspended_at": "2026-02-23",
+      "notes": "Meta-strategy. Runs via generate_band_signals.py. Requires 4+ strategies to agree on same bucket. SUSPENDED 2026-02-23: see suspended_reason."
     },
     "band_2_moderate": {
       "strategy_id": "band_2_moderate",
@@ -759,6 +799,42 @@
       "created_at": "2026-02-20",
       "notes": "First model with directional prediction. Strong on gold/silver, weaker on bronze. At 5% edge: +75.1% ROI."
     },
+    "regime_tail_primary": {
+      "strategy_id": "regime_tail_primary",
+      "strategy_name": "Regime-Aware Tail Boost (Primary)",
+      "model_id": "regime_tail_v1",
+      "status": "paper",
+      "description": "Issue #5 fix: asymmetric tail boost that adjusts direction based on rolling_avg vs crowd_ev regime signal. Replaces symmetric TailBoost which was betting the wrong direction during Feb 2026 low-tweet regime.",
+      "filters": {
+        "min_edge": 0.02,
+        "max_edge": 0.3,
+        "min_bucket_price": 0.02,
+        "max_bucket_price": 0.5,
+        "market_types": [
+          "weekly",
+          "daily",
+          "short"
+        ],
+        "min_duration_days": 1,
+        "require_temporal_features": true
+      },
+      "sizing": {
+        "kelly_fraction": 0.25,
+        "max_bet_pct": 0.05,
+        "min_bet": 5.0,
+        "bankroll": 1000.0
+      },
+      "entry": {
+        "hours_before_close": 24,
+        "entry_window_hours": 6
+      },
+      "backtest_summary": {
+        "tier": "n/a",
+        "notes": "Pending initial backtest validation."
+      },
+      "created_at": "2026-02-23",
+      "notes": "Issue #5 fix. Paper trade to validate regime-aware asymmetric tail boost vs symmetric TailBoost."
+    },
     "crowd_hedged_primary": {
       "strategy_id": "crowd_hedged_primary",
       "strategy_name": "Crowd-Hedged Primary (Filtered High-Conviction)",
@@ -789,11 +865,11 @@
         "entry_window_hours": 6
       },
       "backtest_summary": {
-        "tier": "gold",
-        "n_events": 38,
-        "n_bets": 37,
-        "brier": 0.803064,
-        "roi_pct": 86.21,
+        "tier": "all",
+        "n_events": 159,
+        "n_bets": 124,
+        "brier": 0.588204,
+        "roi_pct": 25.81,
         "notes": "Auto-updated from run_backtest.py"
       },
       "created_at": "2026-02-21",

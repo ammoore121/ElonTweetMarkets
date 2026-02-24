@@ -1134,6 +1134,29 @@
       "created_at": "2026-02-20",
       "notes": "First model with genuine directional prediction. At 5% min_edge: +75.1% ROI, 23 bets, +$382 P&L. At 2% min_edge: +7.7% ROI."
     },
+    "regime_tail_v1": {
+      "model_id": "regime_tail_v1",
+      "model_name": "Regime-Aware Tail Boost",
+      "module_path": "src.ml.duration_model",
+      "class_name": "RegimeAwareTailBoostModel",
+      "version": "v1",
+      "description": "Asymmetric tail boost that adjusts direction based on regime signal. When crowd overestimates (rolling_avg * duration < crowd_ev), boosts lower tail more and dampens upper tail. Fixes Issue #5: symmetric TailBoost betting the wrong direction during regime shifts.",
+      "approach": "regime_aware_tail",
+      "feature_group": "market_adjusted",
+      "hyperparameters": {
+        "tail_boost_factor": 1.5,
+        "tail_threshold_sd": 0.8,
+        "center_power": 1.0,
+        "regime_strength": 0.6
+      },
+      "data_sources": [
+        "xtracker",
+        "polymarket_clob"
+      ],
+      "status": "active",
+      "created_at": "2026-02-23",
+      "notes": "Issue #5 fix. Extends TailBoostModel with regime-aware asymmetric tail boosting. Uses rolling_avg_7d_calendar and data_coverage_7d for regime detection."
+    },
     "crowd_hedged_v1": {
       "model_id": "crowd_hedged_v1",
       "model_name": "Crowd-Hedged Blend",

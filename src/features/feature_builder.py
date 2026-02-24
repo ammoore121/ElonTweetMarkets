@@ -258,17 +258,20 @@ FEATURE_GROUPS: Dict[str, Dict[str, Any]] = {
 # Data loaders (lazy, called once per builder lifetime)
 # ---------------------------------------------------------------------------
 def _load_xtracker_daily() -> dict:
-    """Load daily tweet counts from unified daily_counts.json (Kaggle + XTracker merged).
+    """Load daily tweet counts by merging unified daily_counts.json + XTracker daily_metrics.
 
-    Falls back to XTracker-only daily_metrics_full.json if unified file doesn't exist.
+    Loads both sources and merges them so the most recent data is always available,
+    even if daily_counts.json (rebuilt manually) is stale. XTracker entries override
+    unified entries for the same date when XTracker has a non-zero count.
 
-    Returns dict: date_str -> {count, cumulative, trackingId}
+    Returns dict: date_str -> {count, cumulative, tracking_id}
     """
-    # Prefer unified file (Kaggle + XTracker merged)
+    by_date = {}
+
+    # Layer 1: Unified file (Kaggle + XTracker merged, may be stale)
     if UNIFIED_COUNTS_PATH.exists():
         with open(UNIFIED_COUNTS_PATH, "r", encoding="utf-8") as f:
             raw = json.load(f)
-        by_date = {}
         for date_str, entry in raw.get("daily_counts", {}).items():
             count = entry["count"] if isinstance(entry, dict) else entry
             by_date[date_str] = {
@@ -276,24 +279,23 @@ def _load_xtracker_daily() -> dict:
                 "cumulative": 0,
                 "tracking_id": "",
             }
-        return by_date
 
-    # Fallback: XTracker only
-    if not DAILY_METRICS_PATH.exists():
-        return {}
+    # Layer 2: XTracker daily metrics (refreshed by cron, overlay newer data)
+    if DAILY_METRICS_PATH.exists():
+        with open(DAILY_METRICS_PATH, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        for record in raw.get("data", []):
+            date_str = record["date"][:10]
+            count = record["data"]["count"]
+            # XTracker overrides unified when it has a non-zero count,
+            # or when the date doesn't exist in unified at all
+            if count > 0 or date_str not in by_date:
+                by_date[date_str] = {
+                    "count": count,
+                    "cumulative": record["data"].get("cumulative", 0),
+                    "tracking_id": record["data"].get("trackingId", ""),
+                }
 
-    with open(DAILY_METRICS_PATH, "r", encoding="utf-8") as f:
-        raw = json.load(f)
-
-    by_date = {}
-    for record in raw.get("data", []):
-        date_str = record["date"][:10]
-        count = record["data"]["count"]
-        by_date[date_str] = {
-            "count": count,
-            "cumulative": record["data"].get("cumulative", 0),
-            "tracking_id": record["data"].get("trackingId", ""),
-        }
     return by_date
 
 

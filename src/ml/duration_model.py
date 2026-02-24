@@ -286,6 +286,163 @@ class TailBoostModel(BasePredictionModel):
 
 
 # ---------------------------------------------------------------------------
+# Variant 2b: Regime-Aware Tail Boost (Issue #5)
+# ---------------------------------------------------------------------------
+
+class RegimeAwareTailBoostModel(TailBoostModel):
+    """Tail boost that adjusts asymmetrically based on regime signals.
+
+    When rolling_avg * duration < crowd_ev (crowd overestimating):
+        -> boost LOWER tail more, UPPER tail less
+    When rolling_avg * duration > crowd_ev (crowd underestimating):
+        -> boost UPPER tail more, LOWER tail less
+    When ambiguous or no temporal data:
+        -> fall back to symmetric (standard TailBoost)
+
+    This fixes the core Issue #5 problem: standard TailBoost boosts both
+    tails equally, which in an overestimating regime pushes bets upward —
+    further from reality.
+    """
+
+    REGIME_STRENGTH = 0.6   # How much to skew (0=symmetric, 1=fully asymmetric)
+
+    def __init__(
+        self,
+        name: str = "regime_tail",
+        version: str = "v1",
+        tail_boost_factor: float = None,
+        tail_threshold_sd: float = None,
+        center_power: float = None,
+        regime_strength: float = None,
+    ):
+        super().__init__(
+            name=name,
+            version=version,
+            tail_boost_factor=tail_boost_factor,
+            tail_threshold_sd=tail_threshold_sd,
+            center_power=center_power,
+        )
+        if regime_strength is not None:
+            self.REGIME_STRENGTH = regime_strength
+
+    def predict(
+        self,
+        features: dict,
+        buckets: list[dict],
+        context: Optional[dict] = None,
+    ) -> dict[str, float]:
+        if not buckets:
+            return {}
+
+        crowd_probs = _get_crowd_probs(buckets, context)
+        if crowd_probs is None:
+            n = len(buckets)
+            return {b["bucket_label"]: 1.0 / n for b in buckets}
+
+        market = features.get("market", {})
+        crowd_ev = market.get("crowd_implied_ev")
+        crowd_std = market.get("crowd_std_dev")
+
+        if crowd_ev is None or crowd_std is None or float(crowd_std) <= 0:
+            crowd_ev = _compute_implied_ev(buckets, crowd_probs)
+            var = 0.0
+            for b in buckets:
+                mid = _bucket_midpoint(b, buckets)
+                p = crowd_probs.get(b["bucket_label"], 0.0)
+                var += p * (mid - crowd_ev) ** 2
+            crowd_std = math.sqrt(var) if var > 0 else 50.0
+
+        crowd_ev = float(crowd_ev)
+        crowd_std = float(crowd_std)
+
+        # Compute regime signal
+        regime_signal = self._compute_regime_signal(features, context, crowd_ev)
+
+        probs = {}
+        for b in buckets:
+            label = b["bucket_label"]
+            p = crowd_probs.get(label, PROB_FLOOR)
+            mid = _bucket_midpoint(b, buckets)
+
+            z = abs(mid - crowd_ev) / crowd_std if crowd_std > 0 else 0
+
+            if z >= self.TAIL_THRESHOLD_SD:
+                # Determine tail direction relative to crowd EV
+                if mid < crowd_ev:
+                    # Lower tail: boost more when crowd overestimates (regime_signal < 0)
+                    directional_mult = 1 + self.REGIME_STRENGTH * (-regime_signal)
+                else:
+                    # Upper tail: boost more when crowd underestimates (regime_signal > 0)
+                    directional_mult = 1 + self.REGIME_STRENGTH * regime_signal
+
+                # Clamp multiplier to reasonable range [0.3, 2.0]
+                directional_mult = max(0.3, min(2.0, directional_mult))
+                probs[label] = p * self.TAIL_BOOST_FACTOR * directional_mult
+            else:
+                # Center bucket: optionally sharpen
+                if self.CENTER_POWER != 1.0:
+                    probs[label] = max(p ** self.CENTER_POWER, PROB_FLOOR)
+                else:
+                    probs[label] = p
+
+        return _normalize(probs)
+
+    def _compute_regime_signal(
+        self,
+        features: dict,
+        context: Optional[dict],
+        crowd_ev: float,
+    ) -> float:
+        """Compute regime signal: negative = crowd overestimating, positive = underestimating.
+
+        Returns value clipped to [-1, +1]. Returns 0 when data is insufficient.
+        """
+        temporal = features.get("temporal", {})
+        calendar = features.get("calendar", {})
+
+        # Prefer calendar-day average (conservative), fall back to standard
+        rolling_avg = temporal.get("rolling_avg_7d_calendar")
+        if rolling_avg is None:
+            rolling_avg = temporal.get("rolling_avg_7d")
+        if rolling_avg is None:
+            rolling_avg = temporal.get("rolling_avg_14d")
+
+        if rolling_avg is None:
+            return 0.0
+
+        # Check data coverage — defer to symmetric if sparse
+        data_coverage = temporal.get("data_coverage_7d")
+        if data_coverage is not None and data_coverage < 0.5:
+            return 0.0
+
+        # Get event duration
+        duration = calendar.get("event_duration_days")
+        if duration is None and context:
+            duration = context.get("duration_days")
+        if duration is None or duration <= 0:
+            return 0.0
+
+        if crowd_ev <= 0:
+            return 0.0
+
+        expected_total = rolling_avg * duration
+        regime_signal = (expected_total - crowd_ev) / crowd_ev
+
+        # Clip to [-1, +1]
+        return max(-1.0, min(1.0, regime_signal))
+
+    def get_config(self) -> dict:
+        config = super().get_config()
+        config["regime_strength"] = self.REGIME_STRENGTH
+        return config
+
+    def get_hyperparameters(self) -> dict:
+        params = super().get_hyperparameters()
+        params["regime_strength"] = self.REGIME_STRENGTH
+        return params
+
+
+# ---------------------------------------------------------------------------
 # Variant 3: Combined Duration + Tail Boost
 # ---------------------------------------------------------------------------
 

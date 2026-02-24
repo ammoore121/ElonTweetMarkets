@@ -94,7 +94,7 @@ def main():
     # 4. Daily metrics - fetch in monthly chunks going back as far as possible
     print("\n[4/5] Fetching daily metrics (chunked by month)...")
     all_daily = []
-    end = datetime(2026, 2, 10)
+    end = datetime.now(tz=None) + timedelta(days=1)  # through tomorrow to catch today
     # Try going back to 2024-01-01 - API will return what it has
     start_target = datetime(2024, 1, 1)
     current = start_target
@@ -126,7 +126,7 @@ def main():
     # 5. Hourly metrics - just recent period (last 3 months)
     print("\n[5/5] Fetching hourly metrics (last 3 months)...")
     all_hourly = []
-    hourly_start = datetime(2025, 11, 1)
+    hourly_start = end - timedelta(days=90)  # last 3 months
     current = hourly_start
 
     while current < end:

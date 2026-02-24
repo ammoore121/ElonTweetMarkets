@@ -318,12 +318,13 @@ def main():
         odds_obj = tracker.get_odds(odds_id)
         event_slug = odds_obj.event_slug if odds_obj else ""
 
-        # Check for existing position before placing betslip
-        if event_slug and tracker.has_open_position(event_slug, best_bucket):
+        # Check for existing position: max 1 bet per event per strategy,
+        # regardless of which bucket the model currently favours.
+        if event_slug and tracker.has_open_position(event_slug, strategy_id=strategy_id):
             logger.info(
-                "  Already have open position on %s/%s, skipping betslip",
+                "  Already have open position on %s for strategy %s, skipping betslip",
                 event_slug,
-                best_bucket,
+                strategy_id,
             )
             continue
 

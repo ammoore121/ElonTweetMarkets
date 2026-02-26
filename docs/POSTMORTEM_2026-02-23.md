@@ -210,6 +210,52 @@ We are systematically betting on buckets that are 2-3x too high.
 
 ---
 
+## Checkpoint: Betslip Deduplication (2026-02-26)
+
+The per-event position limit bug (Issue #1) was fixed in code on Feb 23 (commit
+`9daa70a`), but 102 duplicate bets placed *before* the fix remained in the paper
+trading data. These settled after the fix landed, inflating losses dramatically.
+
+On Feb 26 we retroactively cleaned the betslip data to reflect what *would have
+happened* if the fix had been in place from day one: for each (event_slug,
+strategy_id) pair with multiple bets, we kept only the first bet (by `placed_at`)
+and removed the rest — the same logic as `tracker.has_open_position()`.
+
+### Impact
+
+| Metric | Before cleanup | After cleanup |
+|--------|---------------|---------------|
+| Total betslips | 172 | **70** |
+| Settled bets | 144 (4W / 140L) | **48 (3W / 45L)** |
+| Total wagered | $3,380 | **$894** |
+| P&L | -$2,013 | **+$373** |
+| ROI | -59.5% | **+41.7%** |
+| Open bets | 27 ($281) | **22 ($208)** |
+
+The portfolio was actually profitable the entire time — the -$2K loss was entirely
+caused by the multiplicative bet duplication bug.
+
+### Files modified
+
+- `data/paper_trading/betslips.parquet` — 102 duplicate betslips removed
+- `data/paper_trading/fills.parquet` — corresponding fills removed
+- `data/paper_trading/settlements.parquet` — corresponding settlements removed,
+  cumulative stats (cumul_pnl, cumul_roi_pct, total_bets, total_wins, win_rate_pct)
+  recomputed on the remaining 48 settled bets
+- Backups saved as `*_backup.parquet`
+
+### Methodology
+
+```python
+# Join betslips with signals to get strategy_id
+merged = betslips.merge(signals[['signal_id', 'strategy_id']], on='signal_id')
+merged = merged.sort_values('placed_at')
+# Keep first bet per (event_slug, strategy_id) — same as has_open_position() fix
+keep_mask = ~merged.duplicated(subset=['event_slug', 'strategy_id'], keep='first')
+```
+
+---
+
 ## Current Status (as of 2026-02-23)
 
 ### Active Strategies (7)

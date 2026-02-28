@@ -1,13 +1,13 @@
 {
-  "version": "6.0",
-  "updated_at": "2026-02-17",
+  "version": "7.0",
+  "updated_at": "2026-02-24",
   "strategies": {
     "tail_boost_primary": {
       "strategy_id": "tail_boost_primary",
       "strategy_name": "Tail Boost Primary (Most Trusted)",
       "model_id": "tail_boost_v1",
       "status": "inactive",
-      "suspended_reason": "Regime shift: systematic upward bias in low-volume period. 1W/36L, -84.2% ROI. Re-evaluate after temporal feature fix (task #2). Suspended 2026-02-23.",
+      "suspended_reason": "RETIRED 2026-02-27. Strictly dominated by duration_tail_robust (which adds duration awareness). 0W/11L live, -$125. Systematic upward bias: avg bet bucket 200+ vs actual ~82. No unique signal worth iterating.",
       "description": "Primary production strategy. TailBoost is most trusted due to highest bet volume (60 bets in backtest) giving strongest statistical confidence at +44.4% ROI.",
       "filters": {
         "min_edge": 0.02,
@@ -48,14 +48,13 @@
       "strategy_name": "Duration-Tail Robust",
       "model_id": "duration_tail_v1",
       "status": "paper",
-      "description": "Most robust by absolute P&L. Duration-aware shrink + tail boost. 43 bets at +67.7% ROI, highest P&L ($289).",
+      "description": "Most robust by absolute P&L. Duration-aware shrink + tail boost. Restricted to daily/short after investigation: +$1101 ROI on daily/short vs -$98 on weekly in live paper trading.",
       "filters": {
         "min_edge": 0.02,
         "max_edge": 0.3,
         "min_bucket_price": 0.02,
         "max_bucket_price": 0.5,
         "market_types": [
-          "weekly",
           "daily",
           "short"
         ],
@@ -81,7 +80,7 @@
         "notes": "Auto-updated from run_backtest.py"
       },
       "created_at": "2026-02-11",
-      "notes": "Best absolute P&L. 43 bets is high confidence."
+      "notes": "Restricted to daily/short 2026-02-27. Weekly markets removed: 0W/9L live, systematic upward bias (+186 tweets avg) on weekly crowd EV."
     },
     "asymmetric_selective": {
       "strategy_id": "asymmetric_selective",
@@ -248,7 +247,8 @@
       "strategy_id": "signal_enhanced_volume",
       "strategy_name": "Signal-Enhanced Volume (New Best)",
       "model_id": "signal_enhanced_tail_v3",
-      "status": "paper",
+      "status": "inactive",
+      "suspended_reason": "RETIRED 2026-02-27. Correlated duplicate: bet identical buckets as 9 other strategies (e.g., 10 strats on 40-64 for Feb 23-25). No independent signal vs TailBoost/ConsensusEnsemble. 0W/3L live, -$40. Keep v3 codebase as iteration base only.",
       "description": "New best strategy by total P&L. TailBoost v3 enhanced with Tesla/crypto/Wikipedia signals. 188 bets at +17.7% ROI, +$395 P&L. Replaces tail_boost_primary as most trusted.",
       "filters": {
         "min_edge": 0.02,
@@ -289,7 +289,8 @@
       "strategy_id": "signal_enhanced_selective",
       "strategy_name": "Signal-Enhanced Selective (Best ROI)",
       "model_id": "signal_enhanced_tail_v1",
-      "status": "paper",
+      "status": "inactive",
+      "suspended_reason": "SUSPENDED 2026-02-27. Right idea (high min_edge filtering) but insufficient live data (2 bets). Keep suspended until regime recalibration complete, then re-evaluate at 5% min_edge on daily/short only.",
       "description": "Highest ROI strategy: +84.4% on 22 bets at 5% min_edge. Financial/attention signals dramatically improve bet selection when filtering aggressively. Best for capital-constrained deployment.",
       "filters": {
         "min_edge": 0.05,
@@ -330,8 +331,9 @@
       "strategy_id": "signal_enhanced_v4_volume",
       "strategy_name": "Signal-Enhanced V4 Volume (7-Signal)",
       "model_id": "signal_enhanced_tail_v4",
-      "status": "paper",
-      "description": "V4 model with 7 signals (VIX + Google Trends + Crypto F&G added). Volume strategy at 2% min_edge. Pending backtest validation.",
+      "status": "inactive",
+      "suspended_reason": "RETIRED 2026-02-27. Correlated duplicate of signal_enhanced_volume (v3). Added signals (VIX, Trends, F&G) provided no differentiation: bet same buckets as v3/v5. 0W/3L, -$42.",
+      "description": "V4 model with 7 signals (VIX + Google Trends + Crypto F&G added). Volume strategy at 2% min_edge. RETIRED: no independent signal vs v3.",
       "filters": {
         "min_edge": 0.02,
         "max_edge": 0.3,
@@ -370,8 +372,9 @@
       "strategy_id": "price_dynamics_primary",
       "strategy_name": "Price Dynamics (Primary)",
       "model_id": "price_dynamics_v1",
-      "status": "paper",
-      "description": "Momentum-following tail boost. Best all-tier performer: +33.1% ROI, 116 bets.",
+      "status": "inactive",
+      "suspended_reason": "SUSPEND-ITERATE 2026-02-27. Momentum signal is real (backtest +33% ROI) but broken by regime shift: crowd EV anchor ~293 vs live ~105. 0W/3L live, -$39. Iterate: recalibrate momentum on Oct 2025+ data, restrict to daily/short.",
+      "description": "Momentum-following tail boost. Backtest +33.1% ROI but regime-shifted. ITERATE candidate after recalibration.",
       "filters": {
         "min_edge": 0.02,
         "max_edge": 0.3,
@@ -409,8 +412,9 @@
       "strategy_id": "consensus_primary",
       "strategy_name": "Consensus Ensemble (Primary)",
       "model_id": "consensus_ensemble_v1",
-      "status": "paper",
-      "description": "Best all-tier model: +37.0% ROI, 132 bets, $594 P&L. Blends TailBoost, PriceDynamics, SignalEnhanced v3.",
+      "status": "inactive",
+      "suspended_reason": "RETIRED 2026-02-27. Ensemble of 3 broken models (TailBoost + PriceDynamics + SignalEnhanced v3) that all share same crowd-EV anchor. No independent signal: when one fails, all fail. 0W/3L live, -$37.",
+      "description": "Ensemble of TailBoost + PriceDynamics + SignalEnhanced v3. RETIRED: all components share crowd-EV anchor that regime-shifted.",
       "filters": {
         "min_edge": 0.02,
         "max_edge": 0.3,
@@ -490,8 +494,8 @@
       "strategy_name": "XGBoost Residual Corrector",
       "model_id": "xgb_residual_v1",
       "status": "inactive",
-      "suspended_reason": "Regime shift: XGB trained on crowd_ev ~293, live crowd_ev ~105. 0W/11L, -100% ROI. Requires retraining on post-Oct 2025 data. Suspended 2026-02-23.",
-      "description": "Residual correction over crowd prices. More conservative framing. Requires training.",
+      "suspended_reason": "SUSPEND-ITERATE 2026-02-27. Distribution shift: trained on crowd_ev ~293, live crowd_ev ~105. 0W/8L live, -$176. Salvageable: residual framing is sound (+28.4% CV ROI). Requires retraining on Oct 2025+ data ONLY, then restrict to daily/short.",
+      "description": "Residual correction over crowd prices. ITERATE candidate: retrain on post-Oct 2025 data with current regime crowd EV.",
       "filters": {
         "min_edge": 0.02,
         "max_edge": 0.3,
@@ -531,8 +535,9 @@
       "strategy_id": "signal_enhanced_v5_volume",
       "strategy_name": "Signal-Enhanced V5 Volume (10-Signal)",
       "model_id": "signal_enhanced_tail_v5",
-      "status": "paper",
-      "description": "V5 model with 10 signals (v4 + govt calendar, corporate events, price momentum). Gold +72.3%, Silver +281.7%, Bronze -46.9%. ALL +7.5% ROI, 119 bets.",
+      "status": "inactive",
+      "suspended_reason": "RETIRED 2026-02-27. Correlated duplicate of v3/v4. Extra signals (govt, corporate, momentum) produced no bucket-level differentiation. 0W/3L live, -$37.",
+      "description": "V5 model with 10 signals. RETIRED: no differentiation from v3/v4, correlated duplicate.",
       "filters": {
         "min_edge": 0.02,
         "max_edge": 0.3,
@@ -682,8 +687,8 @@
       "strategy_name": "Strategy Band 1 (High Confidence)",
       "model_id": "strategy_bands_v1",
       "status": "inactive",
-      "suspended_reason": "Suspended 2026-02-23. Live paper trading result: 0/3 wins, -100% ROI, -$101.67 P&L. Three failure mechanisms identified: (1) The 4+ strategy agreement threshold is almost never reached in live trading -- only 3 bets fired vs the broad bet volumes seen in historical backtest, making the band a near-dead letter in production. (2) Correlated base model failure: all contributing strategies (TailBoost, ConsensusEnsemble, PriceDynamics, SignalEnhanced) share the same crowd-EV anchor. When the crowd-EV anchor misfires in a live regime, all base strategies fail simultaneously and band_1 inherits the loss with amplified sizing (0.30 Kelly, 6% max bet) -- the opposite of independent consensus. (3) This entry was missing from the registry entirely when the strategy was live -- generate_band_signals.py emits strategy_id='band_1' but only 'band_1_aggressive' existed in the registry, creating a tracking and oversight gap. Reactivate conditions: (a) base strategies show sustained positive live P&L, (b) band threshold is re-validated on recent-period (Oct 2025+) events only, (c) base model diversity is improved so not all contributors share the same anchor.",
-      "description": "Meta-strategy: 4+ base strategies agree on same bucket. 0.30 Kelly (calibrated from sizing analysis: consensus edges ~= base edges, modest premium for coordination). SUSPENDED -- see suspended_reason.",
+      "suspended_reason": "RETIRED 2026-02-27. Meta-strategy over correlated base models. When all base models share the same crowd-EV anchor, 4+ agreement = correlated failure with amplified sizing (0.30 Kelly). 0W/1L settled live, -$36. All base models now retired or suspended.",
+      "description": "Meta-strategy: 4+ base strategies agree. RETIRED: base models are correlated duplicates, consensus amplifies shared failures.",
       "filters": {
         "min_edge": 0.02,
         "max_edge": 0.3,
@@ -755,8 +760,9 @@
       "strategy_id": "directional_signal_primary",
       "strategy_name": "Directional Signal (Primary)",
       "model_id": "directional_signal_v1",
-      "status": "paper",
-      "description": "First directional model in paper trading. Uses signed DOGE/launches/tone/attention signals to predict UP/DOWN shift before applying tail boost. Deployed at 2% min_edge for volume.",
+      "status": "inactive",
+      "suspended_reason": "SUSPEND-ITERATE 2026-02-27. Unique signed-signal approach (only model with directional prediction). 0W/3L at 2% edge, but backtest shows +75.1% ROI at 5% edge. Iterate: raise min_edge to 5%, restrict to daily/short, recalibrate signal weights on Oct 2025+ data.",
+      "description": "First directional model. ITERATE candidate: unique signed-signal approach, strong at high conviction (5% edge). Needs recalibration + daily/short restriction.",
       "filters": {
         "min_edge": 0.02,
         "max_edge": 0.3,
@@ -803,8 +809,9 @@
       "strategy_id": "regime_tail_primary",
       "strategy_name": "Regime-Aware Tail Boost (Primary)",
       "model_id": "regime_tail_v1",
-      "status": "paper",
-      "description": "Issue #5 fix: asymmetric tail boost that adjusts direction based on rolling_avg vs crowd_ev regime signal. Replaces symmetric TailBoost which was betting the wrong direction during Feb 2026 low-tweet regime.",
+      "status": "inactive",
+      "suspended_reason": "RETIRED 2026-02-27. Failed both backtest (-80.5% ROI, 36 bets) AND live (-$130, 0W/3L). Highest per-bet loss of any strategy ($43/bet avg). Regime signal concept is unsalvageable in current form.",
+      "description": "Regime-aware asymmetric tail boost. RETIRED: failed backtest and live. Fundamentally broken.",
       "filters": {
         "min_edge": 0.02,
         "max_edge": 0.3,
@@ -839,8 +846,9 @@
       "strategy_id": "crowd_hedged_primary",
       "strategy_name": "Crowd-Hedged Primary (Filtered High-Conviction)",
       "model_id": "crowd_hedged_v1",
-      "status": "paper",
-      "description": "CrowdHedged w=0.20 at kelly=0.40. 20%% crowd anchor filters weak edges from ConsensusEnsemble, keeping only highest-conviction bets. Gold backtest: +86.2%% ROI (37 bets) vs CE +71.0%% (58 bets). Sized up to deploy similar capital.",
+      "status": "inactive",
+      "suspended_reason": "RETIRED 2026-02-27. Strict subset of ConsensusEnsemble (itself retired). When CE fails, CH fails with amplified sizing (0.40 Kelly). 0W/3L live, -$48. No independent signal.",
+      "description": "CrowdHedged: filtered ConsensusEnsemble bets. RETIRED: dependent on broken CE, amplified losses with higher sizing.",
       "filters": {
         "min_edge": 0.02,
         "max_edge": 0.3,

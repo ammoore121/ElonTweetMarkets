@@ -21,6 +21,69 @@ An end-to-end quantitative prediction system for **Polymarket's Elon Musk tweet 
 
 ## 2. Why This Project Is Interesting
 
+### System at a Glance
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        DATA LAYER (11 sources)                        │
+│                                                                       │
+│  XTracker ──┐   Tesla/Crypto ──┐   GDELT ──┐   Wikipedia ──┐         │
+│  Kaggle ────┤   VIX ───────────┤   SpaceX ──┤   Reddit ────┤         │
+│  Polymarket ┤   Crypto F&G ────┘   Gov/Corp ┘   Trends ────┘         │
+│             │                                                         │
+│             ▼                                                         │
+│  data/sources/{source}/     ← versioned folders, schema.md, logs     │
+│  data/datacatalog.csv       ← central registry (20 entries)          │
+│  data/processed/            ← market_catalog, xtracker_mapping       │
+└──────────────────────────────────┬──────────────────────────────────────┘
+                                   │
+                                   ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│                       FEATURE PIPELINE                                 │
+│                                                                        │
+│  extractors.py (11 categories) → feature_builder.py → 113 features    │
+│  factor_registry.py (88 documented factors with formulas + rationale)  │
+└──────────────────────────────────┬───────────────────────────────────────┘
+                                   │
+                                   ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         MODEL LAYER                                    │
+│                                                                        │
+│  26 models (src/ml/)                                                   │
+│  ├─ Heuristic: TailBoost, PriceDynamics, SignalEnhanced, Duration...   │
+│  ├─ ML: XGBoostResidual (+28% CV), XGBoostBucket                      │
+│  └─ Ensemble: ConsensusEnsemble (+37% backtest)                       │
+│                                                                        │
+│  Validation: BacktestEngine (159 events, 3 tiers, walk-forward CV)     │
+│  Registry:   models/model_registry.json (identity + hyperparams)       │
+└──────────────────────────────────┬───────────────────────────────────────┘
+                                   │
+                                   ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│                      STRATEGY + EXECUTION                              │
+│                                                                        │
+│  strategies/strategy_registry.json (10 paper, 6 inactive)              │
+│  ├─ Filters: min_edge, bucket_price, market_type                       │
+│  ├─ Sizing: quarter-Kelly, bankroll, max_bet_pct                       │
+│  └─ Entry: hours_before_close, entry_window                            │
+│                                                                        │
+│  cron_pipeline.py (every 6h): fetch → build → signal → settle → report│
+└──────────────────────────────────┬───────────────────────────────────────┘
+                                   │
+                                   ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│                   PAPER TRADING + FEEDBACK                             │
+│                                                                        │
+│  Signal → Betslip → Fill → Settlement (XTracker oracle)                │
+│  data/paper_trading/ (parquet-backed P&L tracking)                     │
+│                                                                        │
+│  Feedback loop:                                                        │
+│    Post-mortems (docs/POSTMORTEM_*.md) → CLAUDE.md gotchas → retrain  │
+│    Checkpoints (docs/CHECKPOINT_*.md) → strategy retire/iterate       │
+│    MEMORY.md (cross-session learnings) ← agent references on startup  │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
 ### A. Agentic, Iterative Workflow
 
 This wasn't built linearly. It was built through **rapid hypothesis testing with AI agents** — Claude Code agents running parallel model searches, validating approaches fail-fast, and documenting everything.
@@ -44,6 +107,22 @@ Each phase produced concrete deliverables documented in `task.md` (466 lines of 
 | 11 | XGBoost ML: walk-forward CV, residual beats heuristics | 1.0 |
 | 12 | Strategy bands: meta-strategy, confidence-based sizing | 1.0 |
 
+#### Notetaking, Memory & Decision Records
+
+The agentic workflow relies on a layered documentation system that ensures continuity across sessions and prevents repeated mistakes:
+
+- **`MEMORY.md`** (persistent cross-session memory): Loaded into every agent conversation on startup. Contains API endpoint gotchas, data quality traps, model performance summaries, and architecture notes — all accumulated and refined across dozens of sessions. The agent updates this after each session with stable findings, and removes entries that turn out to be wrong.
+
+- **`CLAUDE.md`** (project instructions): The canonical reference document. Contains critical gotchas (distributional prediction, XTracker zero-count days, temporal leakage), pipeline commands, architecture overview, and model performance tables. Agents are instructed to check this first and adhere to its constraints. When a checkpoint or post-mortem surfaces a new gotcha, it gets promoted into CLAUDE.md as a permanent guideline.
+
+- **Checkpoints** (`docs/CHECKPOINT_*.md`): Triggered when P&L crosses a threshold or a pattern emerges. Structured analysis: trigger → executive summary → findings → actions taken. Example: the Feb 27 strategy bleed checkpoint diagnosed that 12/14 strategies were correlated duplicates, leading to 8 retirements and a restriction of duration models to daily/short markets only.
+
+- **Post-mortems** (`docs/POSTMORTEM_*.md`): Written after significant losses. Root-cause analysis with numbered issues, evidence, fixes, and monitoring. Example: the Feb 23 post-mortem found 3 bugs (position limit bypass, feature loading, duplicate bets) plus a regime shift, leading to code fixes and new validation checks.
+
+- **`task.md`** (progress tracker): Living log of every phase, model, and validation result with dates. Acts as the project's chronological record — 466 lines covering data collection through live deployment.
+
+This system creates a feedback loop: live results → post-mortem/checkpoint → CLAUDE.md gotchas → agent behavior change → better decisions next session.
+
 ### B. Data Sourcing Was Iterative, Not Predetermined
 
 We didn't start with 11 data sources. We started with 2 (XTracker + Kaggle), discovered what signals existed, and added sources to fill gaps:
@@ -54,6 +133,27 @@ We didn't start with 11 data sources. We started with 2 (XTracker + Kaggle), dis
 **Wave 4** (Day 7): Government calendar, Corporate events, Reddit, Order book, Trade history — added for volume scaling and new edge discovery
 
 Each source was **validated before integration**: if it didn't add signal, it was dropped (SEC EDGAR = low signal, ElonJet Mastodon = 24h delay too stale, Social Blade = scraping risk).
+
+#### Data Catalog & Source Management
+
+Every data source lives in a versioned subdirectory under `data/sources/` with its own documentation:
+
+```
+data/sources/
+  xtracker/       schema.md, daily_metrics_full.json, hourly_metrics_full.json, ...
+  polymarket/     schema.md, versions.md, DATA_INVENTORY.md, prices/, orderbook/, trades/
+  gdelt/          schema.md, gdelt_all_combined.json, per-entity-mode JSONs
+  calendar/       schema.md, spacex_launches_historical.json, corporate_events.parquet
+  market/         tesla_daily.parquet, crypto_daily.parquet, vix_daily.parquet, crypto_fear_greed.parquet
+  trends/         google_trends.parquet
+  wikipedia/      pageviews.json
+  reddit/         daily_activity.parquet, fetch_log.json
+  government/     events.parquet, fetch_log.json
+```
+
+Each source subdirectory maintains **schema documentation** (field definitions, types, gotchas) and **version history** (what changed per collection run). For example, `polymarket/versions.md` tracks that v1.0 had 125 events, documents known gaps (Sept 13-27 2024), and notes parsing quirks (double-encoded JSON fields). `xtracker/schema.md` documents the noon-to-noon counting window that causes 30/103 zero-count artifacts.
+
+The central **`data/datacatalog.csv`** (20 entries) ties everything together — each row records the source ID, storage location, fetch script, record count, date range, and downstream features produced. This makes provenance traceable end-to-end: raw API response → versioned source folder → fetch script → feature extractor → factor registry → model → strategy → paper trade.
 
 ### C. Models Flow from Creation → Registry → Strategy → Deployment
 

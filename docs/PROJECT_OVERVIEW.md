@@ -453,4 +453,55 @@ Step 6: Print performance summary
 
 ---
 
-*Generated 2026-02-20. For technical details see `task.md`, `docs/RESEARCH.md`, `CLAUDE.md`.*
+## 8. Getting Started
+
+### Prerequisites
+
+```bash
+pip install -r requirements.txt   # pandas, pyarrow, xgboost, scikit-learn, requests, pytrends, yfinance, praw
+```
+
+### Quick Start
+
+```bash
+# 1. Fetch data (all free, no API keys required for core sources)
+python scripts/fetch_xtracker_history.py
+python scripts/fetch_elon_markets.py
+python scripts/fetch_clob_prices.py --daily
+python scripts/fetch_market_data.py
+
+# 2. Build datasets
+python scripts/build_market_catalog.py
+python scripts/build_xtracker_mapping.py
+python scripts/build_backtest_dataset.py
+
+# 3. Run a backtest
+python scripts/run_backtest.py --model tail_boost --all        # Heuristic model
+python scripts/run_backtest.py --strategy consensus_primary    # Full strategy
+
+# 4. Train & evaluate ML models
+python scripts/train_xgb_model.py              # Walk-forward CV
+python scripts/train_xgb_model.py --compare    # Compare vs heuristics
+
+# 5. Run the live pipeline (paper trading)
+python scripts/cron_pipeline.py                # Full 17-step cycle
+```
+
+### For AI Agents
+
+This project is designed for **agentic development with Claude Code**. If you're an agent working on this codebase:
+
+1. **Start with `CLAUDE.md`** — contains critical gotchas, architecture, and pipeline commands
+2. **Check `task.md`** — living progress tracker with active tasks and blockers
+3. **Read `MEMORY.md`** — cross-session learnings (API quirks, data traps, model insights)
+4. **Document your work**:
+   - Significant findings → update `MEMORY.md` with stable patterns
+   - New gotchas discovered → propose addition to `CLAUDE.md`
+   - Performance regressions → write a checkpoint (`docs/CHECKPOINT_YYYY-MM-DD_topic.md`)
+   - Bugs or losses → write a post-mortem (`docs/POSTMORTEM_YYYY-MM-DD.md`)
+5. **Data sources** live in `data/sources/{source}/` with `schema.md` files — read these before modifying fetch scripts
+6. **Never skip cross-tier validation** — a model that wins on Gold but dies on Bronze is overfitting
+
+---
+
+*Generated 2026-02-20. Updated 2026-03-03. For technical details see `task.md`, `docs/RESEARCH.md`, `CLAUDE.md`.*

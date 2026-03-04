@@ -1,6 +1,5 @@
 # ElonTweetMarkets: Categorical Prediction Market Alpha via Agentic Quant Research
 
-**Audience**: Data strategist / quant pod review
 **Status**: Paper trading live (10 strategies, 6-hour cron cycle)
 **Timeline**: Feb 9-17, 2026 (8 days from idea to live paper trading)
 **Built with**: Claude Code (agentic AI development — iterative research, model search, pipeline automation)
